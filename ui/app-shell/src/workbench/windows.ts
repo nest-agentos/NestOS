@@ -5,7 +5,7 @@ import type {PinnedWindow, PinnedWindowChange, WindowTimes} from '@nestos/app-co
 const log = createModuleLogger('workbench-windows');
 /** Application-owned window metadata; editor instances remain in their workspace. */
 export interface WorkbenchWindow extends WindowTimes {
-    id: string; workspace?: string; title: string; scope?: string; context?: string; location?: string;
+    id: string; resource?: string; workspace?: string; title: string; scope?: string; context?: string; location?: string;
     active: boolean;
     activate(): Promise<void>;
     pinned: boolean; dirty: boolean; failed: boolean; selected: boolean;
@@ -69,7 +69,7 @@ export class WorkbenchWindows {
         if (this.knownPins.has(key)) return this.pins.has(key);
     }
     unopenedPins(items: WorkbenchWindow[]): PinnedWindow[] {
-        const open = new Set(items.map(item => pinKey(item.workspace ?? '', item.id)));
+        const open = new Set(items.map(item => pinKey(item.workspace ?? '', item.resource ?? item.id)));
         return [...this.pins].filter(([key]) => !open.has(key))
             .map(([key, window]) => ({...window, ...this.closedPinTimes.get(key)}));
     }

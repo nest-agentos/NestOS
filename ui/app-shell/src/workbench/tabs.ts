@@ -29,6 +29,7 @@ interface TabsRecovery {
 
 export interface WorkbenchTab<T> extends WindowTimes {
     conversationId?: string;
+    defaultLabel?: string;
     context?: string;
     navigationLabel?: HTMLElement;
     location?: string;
@@ -41,12 +42,14 @@ export interface WorkbenchTab<T> extends WindowTimes {
 interface TabActions<T> {
     toggleSidebar?(): void;
     navigation?: string;
+    defaultWindow?: {id: string; title: string};
     parent?(tab: WorkbenchTab<T>): Promise<void>;
     canGoUp?(tab: WorkbenchTab<T>): boolean;
     describe?(tab: WorkbenchTab<T>): Promise<{ context?: string; location?: string }>;
     activate(id: string): Promise<void>;
     dispose(tab: WorkbenchTab<T>): Promise<void>;
     empty(): void;
+    showEmpty?(): Promise<void>;
     error(error: unknown): void;
     changed?(): void;
 }
@@ -67,6 +70,9 @@ export class WorkbenchTabs<T> {
     private readonly standalone: ReturnType<typeof compactNavigation>;
     private readonly emptyPanel = document.createElement('div');
     private readonly entries = new Map<string, WorkbenchTab<T>>();
+    private readonly pinWrites = new WeakMap<WorkbenchTab<T>, Promise<void>>();
+    private readonly candidates = new WeakSet<WorkbenchTab<T>>();
+    private readonly retainedCandidates = new WeakSet<WorkbenchTab<T>>();
     private readonly closed: { id: string; title: string }[] = [];
     private readonly selected = new Set<string>();
     private readonly metadataRevisions = new WeakMap<WorkbenchTab<T>, number>();
@@ -106,7 +112,13 @@ export class WorkbenchTabs<T> {
         this.observeSidebar();
         for (const tab of restored ?? []) {
             const entry = this.create(tab.id, tab.title, false, readWindowTimes(tab)); entry.pinned = tab.pinned;
+            entry.defaultLabel = tab.defaultLabel;
             entry.context = tab.context; entry.location = tab.location; entry.conversationId = tab.conversationId;
+        }
+        const slot = actions.defaultWindow;
+        if (slot && !this.values().some(tab => tab.defaultLabel && !tab.pinned)) {
+            const empty = this.get(slot.id) ?? this.create(slot.id, slot.title, false);
+            this.activate(empty.id);
         }
         container.addEventListener('keydown', event => this.keydown(event), { signal: this.abort.signal });
         if (windows) this.unregisterWindows = windows.registry.register(windows.id, {items: () => this.windowItems(),
@@ -159,7 +171,7 @@ export class WorkbenchTabs<T> {
     }
     private canGoUp(): boolean {
         const tab = this.current;
-        return !!tab && (this.actions.canGoUp?.(tab) ?? (tab.id.startsWith('/') && tab.id !== '/'));
+        return !!tab && !this.isEmpty(tab) && (this.actions.canGoUp?.(tab) ?? (tab.id.startsWith('/') && tab.id !== '/'));
     }
     private navigationActions() {
         return {parent: () => this.runNavigation('parent')};
@@ -236,7 +248,7 @@ export class WorkbenchTabs<T> {
     }
     private describeOpened(): void {
         if (this.describing || !this.actions.describe) return;
-        const tabs = this.values().filter(tab => !tab.location);
+        const tabs = this.displayed().filter(tab => !tab.location && !this.isEmpty(tab));
         this.describing = Promise.all(tabs.map(async tab => {
             const id = tab.id, revision = this.metadataRevisions.get(tab);
             try {
@@ -253,24 +265,95 @@ export class WorkbenchTabs<T> {
     }
     get content(): HTMLElement { return this.current?.panel ?? this.emptyPanel; }
     get(id: string): WorkbenchTab<T> | undefined { return this.entries.get(id); }
+    private isEmpty(tab: WorkbenchTab<T>): boolean { return tab.id === this.actions.defaultWindow?.id; }
+    windowId(tab: WorkbenchTab<T>): string {
+        const slot = this.actions.defaultWindow;
+        if (!slot || !tab.defaultLabel) return tab.id;
+        const current = this.current;
+        const defaultTab = this.get(slot.id) ?? (current?.defaultLabel && !current.pinned ? current
+            : this.values().find(entry => entry.defaultLabel && !entry.pinned));
+        if (defaultTab === tab) return slot.id;
+        const base = slot.id + '-' + tab.defaultLabel.replaceAll('%', '%25').replaceAll('~', '%7E');
+        const first = this.values().find(entry => entry !== defaultTab && entry.defaultLabel === tab.defaultLabel);
+        return first === tab ? base : base + '~' + encodeURIComponent(tab.id);
+    }
     values(): WorkbenchTab<T>[] { return [...this.entries.values()]; }
+    private displayed(): WorkbenchTab<T>[] { return this.values().filter(tab => !this.candidates.has(tab)); }
     snapshot(): NonNullable<WorkbenchSnapshot['tabs']> {
-        return this.values().filter(tab => !tab.preview).map(tab => this.snapshotTab(tab));
+        return this.displayed().filter(tab => !tab.preview && (!this.isEmpty(tab) || tab.pinned)).map(tab => this.snapshotTab(tab));
     }
-    private snapshotTab({id, title, pinned, conversationId, context, location, createdAt, modifiedAt, accessedAt}: WorkbenchTab<T>): NonNullable<WorkbenchSnapshot['tabs']>[number] {
+    private snapshotTab({id, title, pinned, defaultLabel, conversationId, context, location, createdAt, modifiedAt, accessedAt}: WorkbenchTab<T>): NonNullable<WorkbenchSnapshot['tabs']>[number] {
         const synced = this.windows?.registry.pinned(this.windows.id, id);
-        return {id, title, ...readWindowTimes({createdAt, modifiedAt, accessedAt}), pinned: pinned && synced === undefined,
-            ...(conversationId ? {conversationId} : {}), ...(context ? {context} : {}), ...(location ? {location} : {})};
+        return {id, title, ...readWindowTimes({createdAt, modifiedAt, accessedAt}), pinned: pinned && (synced === undefined || !!defaultLabel),
+            ...(defaultLabel ? {defaultLabel} : {}), ...(conversationId ? {conversationId} : {}), ...(context ? {context} : {}), ...(location ? {location} : {})};
     }
-    async open(id: string, title: string, preview = true): Promise<WorkbenchTab<T>> {
+    async open(id: string, title: string, preview = true, candidate = false): Promise<WorkbenchTab<T>> {
         ++this.opening; this.syncViewState();
         try {
             const existing = this.get(id);
-            if (existing) { this.activate(id); return existing; }
-            const previous = this.values().find(tab => tab.preview);
+            if (existing) {
+                if (candidate && !existing.value) {
+                    this.candidates.add(existing);
+                    this.retainedCandidates.add(existing);
+                }
+                this.activate(id); return existing;
+            }
+            const previous = !candidate && this.values().find(tab => tab.preview && !tab.defaultLabel);
             if (previous) await this.close(previous.id, false);
-            const tab = this.create(id, title, preview); this.activate(id); return tab;
+            const tab = this.create(id, title, preview);
+            if (candidate) this.candidates.add(tab);
+            this.activate(id); return tab;
         } finally { --this.opening; this.syncViewState(); }
+    }
+    async commitDefault(tab: WorkbenchTab<T>, label: string): Promise<void> {
+        const slot = this.actions.defaultWindow;
+        if (!slot) return;
+        const previous = this.values().filter(entry => entry !== tab && (this.isEmpty(entry) || entry.defaultLabel));
+        const stage = {operationId: randomUUID(), started: performance.now()};
+        await this.defaultOperation(stage, 'replace', async () => {
+            const empty = this.get(slot.id);
+            await Promise.all(previous.map(entry => this.pinWrites.get(entry)?.catch(() => {})));
+            const useEmpty = !!empty && !tab.pinned;
+            if (useEmpty && empty.pinned) await this.savePin(tab, true);
+            for (const entry of previous) {
+                if (entry === empty ? useEmpty : !entry.pinned && !tab.pinned) await this.close(entry.id, false);
+            }
+            tab.defaultLabel = label;
+            this.publishCandidate(tab);
+        });
+    }
+    publishCandidate(tab: WorkbenchTab<T>): void {
+        this.candidates.delete(tab); this.retainedCandidates.delete(tab);
+        this.render(); this.tabViewport.reveal();
+    }
+    async discardCandidate(tab: WorkbenchTab<T>, origin?: WorkbenchTab<T>): Promise<boolean> {
+        if (!this.candidates.has(tab)) return false;
+        if (this.retainedCandidates.has(tab)) await this.resetCandidate(tab);
+        else await this.close(tab.id, false);
+        if (origin && this.get(origin.id) === origin) this.activate(origin.id);
+        return true;
+    }
+    private async resetCandidate(tab: WorkbenchTab<T>): Promise<void> {
+        await this.actions.dispose(tab);
+        this.editors.delete(tab);
+        tab.subscriptions.splice(0).forEach(unsubscribe => unsubscribe());
+        tab.panel.replaceChildren();
+        tab.value = undefined;
+        tab.dirty = tab.failed = false;
+        this.publishCandidate(tab);
+    }
+    private async defaultOperation<TValue>(trace: {operationId: string; started: number}, stage: string, work: () => TValue | Promise<TValue>): Promise<TValue> {
+        const fields = {operationId: trace.operationId, stage};
+        try {
+            const value = await work();
+            navigationLog.debug('window.default', {...fields, result: 'success', durationMs: Math.round(performance.now() - trace.started)});
+            return value;
+        } catch (error) {
+            const code = (error as {code?: unknown})?.code;
+            navigationLog.warn('window.default', {...fields, result: 'failure', durationMs: Math.round(performance.now() - trace.started),
+                code: typeof code === 'string' && /^[A-Z][A-Z_0-9]{0,79}$/.test(code) ? code : 'WINDOW_UPDATE_FAILED'});
+            throw error;
+        }
     }
     private create(id: string, title: string, preview: boolean, times?: WindowTimes): WorkbenchTab<T> {
         const panel = document.createElement('div'); panel.className = 'workbench-tabs__panel'; panel.hidden = true;
@@ -288,16 +371,26 @@ export class WorkbenchTabs<T> {
     }
     keep(id: string): void { const tab = this.get(id); if (tab) { tab.preview = false; this.render(); } }
     pin(id: string): void {
-        const tab = this.get(id); if (!tab) return;
-        const pinned = !tab.pinned;
-        const saved = this.windows && !id.startsWith('draft:') && this.windows.registry.setPin({
+        const tab = this.get(id); if (!tab || this.candidates.has(tab)) return;
+        const work = this.savePin(tab, !tab.pinned);
+        this.run(work);
+    }
+    private savePin(tab: WorkbenchTab<T>, pinned: boolean): Promise<void> {
+        const pending = this.pinWrites.get(tab);
+        if (pending) return pending;
+        const {id} = tab;
+        const saved = this.windows && !this.isEmpty(tab) && !id.startsWith('draft:') && this.windows.registry.setPin({
             workspace: this.windows.id, resource: id, title: tab.title,
             scope: this.actions.navigation, context: tab.context, location: tab.location, ...readWindowTimes(tab),
         }, pinned);
-        if (saved) {
-            tab.preview = false; this.render();
-            this.run(saved.then(() => {if (this.get(tab.id) === tab) this.render();}));
-        } else {this.applyPin(tab, pinned); this.keep(tab.id);}
+        if (!saved) {
+            this.applyPin(tab, pinned); this.keep(id);
+            return Promise.resolve();
+        }
+        this.keep(id);
+        const work = saved.finally(() => {if (this.pinWrites.get(tab) === work) this.pinWrites.delete(tab);});
+        this.pinWrites.set(tab, work);
+        return work;
     }
     private applyPin(tab: WorkbenchTab<T>, pinned: boolean): void {
         tab.pinned = pinned;
@@ -307,7 +400,7 @@ export class WorkbenchTabs<T> {
         if (!this.windows) return;
         const {id, registry} = this.windows;
         for (const tab of this.values()) {
-            if (tab.id.startsWith('draft:')) continue;
+            if (this.isEmpty(tab) || tab.id.startsWith('draft:')) continue;
             const pinned = registry.pinned(id, tab.id);
             if (pinned !== undefined) this.applyPin(tab, pinned);
         }
@@ -331,17 +424,35 @@ export class WorkbenchTabs<T> {
         if (!tab || tab.statusIcon === icon && tab.statusTooltip === tooltip) return;
         tab.statusIcon = icon; tab.statusTooltip = tooltip; this.render();
     }
-    rename(id: string, next: string, title: string): void {
+    rename(id: string, next: string, title: string, defaultLabel?: string): void {
         const tab = this.get(id); if (!tab) return;
         if (next !== id && this.get(next)) throw new Error(`Tab already open: ${next}`);
         this.metadataRevisions.set(tab, (this.metadataRevisions.get(tab) ?? 0) + 1);
         const entries = [...this.entries].map(([key, value]) => [key === id ? next : key, value] as const);
+        if (defaultLabel) tab.defaultLabel = defaultLabel;
         tab.id = next; tab.title = title; tab.modifiedAt = Date.now(); this.entries.clear(); for (const [key, value] of entries) this.entries.set(key, value);
         if (next !== id && this.recovery.has(id)) {this.recovery.set(next, this.recovery.get(id)!); this.recovery.delete(id);}
         if (next !== id && this.recoveryFailures.has(id)) {this.recoveryFailures.set(next, this.recoveryFailures.get(id)); this.recoveryFailures.delete(id);}
         if (this.selected.delete(id)) this.selected.add(next);
         if (this.currentId === id) this.currentId = next;
         this.render();
+        if (id !== next && tab.defaultLabel) this.relocatePin(tab, id);
+    }
+    private relocatePin(tab: WorkbenchTab<T>, oldResource: string): void {
+        const binding = this.windows;
+        if (!binding) return;
+        const bookmark = {workspace: binding.id, resource: tab.id, title: tab.title, scope: this.actions.navigation,
+            context: tab.context, location: tab.location, ...readWindowTimes(tab)};
+        const previous = this.pinWrites.get(tab);
+        const move = async () => {
+            await previous?.catch(() => {});
+            if (!binding.registry.pinned(binding.id, oldResource)) return;
+            await binding.registry.setPin(bookmark, true);
+            await binding.registry.setPin({...bookmark, resource: oldResource}, false);
+        };
+        const work = move().finally(() => {if (this.pinWrites.get(tab) === work) this.pinWrites.delete(tab);});
+        this.pinWrites.set(tab, work);
+        this.run(work);
     }
     bind(tab: WorkbenchTab<T>, editor?: IEditor): void {
         if (editor) {
@@ -362,7 +473,7 @@ export class WorkbenchTabs<T> {
         } catch (error) {this.recoveryFailures.set(tab.id, error); throw error;}
     }
     captureRecovery(): TabsRecovery {
-        if (this.opening) throw Object.assign(new Error(t('httpApp.recoveryBusy')), {code: 'RECOVERY_BUSY'});
+        if (this.isOpening()) throw Object.assign(new Error(t('httpApp.recoveryBusy')), {code: 'RECOVERY_BUSY'});
         const editors = new Map(this.recovery);
         for (const [tab, editor] of this.editors) if (!editors.has(tab.id)) editors.set(tab.id, captureEditor(editor, tab.panel));
         return {tabs: this.values().map(tab => this.snapshotTab(tab)), editors};
@@ -397,12 +508,22 @@ export class WorkbenchTabs<T> {
         this.editors.delete(tab); this.recovery.delete(tab.id);
         this.recoveryFailures.delete(tab.id);
         this.selected.delete(tab.id);
-        if (record && !tab.preview) { this.closed.push({ id: tab.id, title: tab.title }); this.windows?.registry.noteClosed(this.windows.id); }
+        if (record && !tab.preview && !this.isEmpty(tab)) { this.closed.push({ id: tab.id, title: tab.title }); this.windows?.registry.noteClosed(this.windows.id); }
         if (this.currentId === tab.id) {
             this.currentId = undefined; this.emptyPanel.hidden = false;
-            if (record) { const next = this.values().at(-1); if (next) await this.actions.activate(next.id); else this.actions.empty(); }
+            if (record) await this.activateAfterClose();
+        }
+        if (record && !this.values().some(entry => this.isEmpty(entry) || entry.defaultLabel && !entry.pinned)) {
+            const slot = this.actions.defaultWindow;
+            if (slot) this.create(slot.id, slot.title, false);
         }
         this.render();
+    }
+    private async activateAfterClose(): Promise<void> {
+        const next = this.displayed().at(-1);
+        if (next && !this.isEmpty(next)) {await this.actions.activate(next.id); return;}
+        if (next) this.activate(next.id);
+        this.actions.empty();
     }
     private run(task: Promise<unknown>): void { void task.catch(error => {this.windows?.registry.report(error); this.actions.error(error);}); }
     private button(label: string, action: () => void, className = ''): HTMLButtonElement {
@@ -442,7 +563,7 @@ export class WorkbenchTabs<T> {
         this.openedDrawer.content.append(toolbar);
         if (this.windows) this.renderWindows();
         else {
-            const tabs = this.values().sort((a, b) => Number(b.pinned) - Number(a.pinned));
+            const tabs = this.displayed().sort((a, b) => Number(b.pinned) - Number(a.pinned));
             for (const tab of tabs) this.bar.append(this.tabHeader(tab));
             tabs.sort((a, b) => compareWindows(a, b, this.openedSort));
             for (const tab of tabs) this.openedDrawer.content.append(this.openedRow(tab));
@@ -479,14 +600,24 @@ export class WorkbenchTabs<T> {
         const close = toolbar.querySelector<HTMLButtonElement>('[data-action=close-selected-tabs]')!; close.classList.add('ui-nav-button');
         actions.append(reopen, saved, close); toolbar.append(actions);
     }
-    private windowCount(): number { return this.windows?.registry.items().length ?? this.entries.size; }
+    private windowCount(): number { return this.windows?.registry.items().length ?? this.displayed().length; }
     private isCurrent(id: string): boolean { return id === this.currentId && (!this.windows || this.windows.isActive()); }
     private requestActivate(id: string): Promise<void> {
+        const tab = this.get(id);
+        if (tab && this.isEmpty(tab)) return this.activateEmpty(tab);
         return this.windows && !this.windows.isActive() ? this.windows.navigate(id) : this.actions.activate(id);
+    }
+    private async activateEmpty(tab: WorkbenchTab<T>): Promise<void> {
+        if (this.windows && !this.windows.isActive()) await this.windows.showNavigation?.();
+        if (this.current === tab) return;
+        await this.actions.showEmpty?.();
+        if (this.get(tab.id) !== tab) return;
+        this.activate(tab.id);
+        this.actions.empty();
     }
     private windowItems(): WorkbenchWindow[] {
         this.syncPins();
-        return this.values().map(tab => ({id: tab.id, workspace: this.windows?.id, title: tab.title, scope: this.actions.navigation,
+        return this.displayed().map(tab => ({id: this.windowId(tab), resource: tab.id, workspace: this.windows?.id, title: tab.title, scope: this.actions.navigation,
             ...readWindowTimes(tab), context: tab.context, location: tab.location, pinned: tab.pinned, dirty: tab.dirty, failed: tab.failed,
             selected: this.selected.has(tab.id), active: this.isCurrent(tab.id), activate: () => this.requestActivate(tab.id), header: () => this.tabHeader(tab), row: () => this.openedRow(tab),
             select: selected => { if (selected) this.selected.add(tab.id); else this.selected.delete(tab.id); },
@@ -531,7 +662,7 @@ export class WorkbenchTabs<T> {
         bar.append(label, close); return bar;
     }
     private tabHeader(tab: WorkbenchTab<T>): HTMLElement {
-        const header = document.createElement('div'); header.className = 'workbench-tabs__tab'; header.dataset.tabId = tab.id;
+        const header = document.createElement('div'); header.className = 'workbench-tabs__tab'; header.dataset.tabId = this.windowId(tab); header.dataset.resource = tab.id;
         header.classList.toggle('is-active', this.isCurrent(tab.id)); header.classList.toggle('is-preview', tab.preview);
         const label = this.button(tab.title, () => this.run(this.requestActivate(tab.id)), 'workbench-tabs__label');
         label.setAttribute('role', 'tab'); label.setAttribute('aria-selected', String(this.isCurrent(tab.id)));
@@ -555,7 +686,7 @@ export class WorkbenchTabs<T> {
         return header;
     }
     private openedRow(tab: WorkbenchTab<T>): HTMLElement {
-        const row = document.createElement('div'); row.className = 'workbench-tabs__opened-row'; row.dataset.openedId = tab.id;
+        const row = document.createElement('div'); row.className = 'workbench-tabs__opened-row'; row.dataset.openedId = this.windowId(tab); row.dataset.resource = tab.id;
         row.classList.toggle('is-active', this.isCurrent(tab.id));
         const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.checked = this.selected.has(tab.id); checkbox.disabled = tab.pinned;
         checkbox.setAttribute('aria-label', `${t('workbench.select')} ${tab.title}`);
@@ -582,7 +713,7 @@ export class WorkbenchTabs<T> {
     }
     private filterOpened(): void {
         for (const row of this.opened.querySelectorAll<HTMLElement>('[data-opened-id]')) {
-            const tab = this.get(row.dataset.openedId!);
+            const tab = this.get(row.dataset.resource!);
             row.hidden = !tab || !this.matchesOpened(tab);
         }
     }
@@ -594,7 +725,10 @@ export class WorkbenchTabs<T> {
         const label = document.createElement('span'); label.className = 'workbench-tabs__context';
         label.textContent = context; label.title = context; return label;
     }
-    private syncViewState(): void { this.container.dataset.workbenchView = this.opening ? 'opening' : this.currentId ? 'active' : 'empty'; }
+    private isOpening(): boolean { return this.opening > 0 || !!this.current && this.candidates.has(this.current); }
+    private syncViewState(): void {
+        this.container.dataset.workbenchView = this.isOpening() ? 'opening' : this.current && !this.isEmpty(this.current) ? 'active' : 'empty';
+    }
     private openedToolbar(): HTMLElement {
         if (this.windows) return this.sharedOpenedToolbar();
         const bar = document.createElement('div'); bar.className = 'workbench-tabs__opened-toolbar';
@@ -616,7 +750,7 @@ export class WorkbenchTabs<T> {
         if (failure) throw failure;
     }
     private async closeSaved(): Promise<void> {
-        for (const tab of this.values()) if (!tab.pinned && !tab.dirty && !tab.failed) await this.close(tab.id);
+        for (const tab of this.displayed()) if (!tab.pinned && !tab.dirty && !tab.failed) await this.close(tab.id);
     }
     private async reopen(): Promise<void> {
         const tab = this.closed.pop(); if (!tab) return;
@@ -627,9 +761,9 @@ export class WorkbenchTabs<T> {
         if (event.key === 'Tab') {
             event.preventDefault();
             if (this.windows) {this.run(this.windows.registry.cycle(event.shiftKey ? -1 : 1)); return;}
-            const tabs = this.values(), index = tabs.findIndex(tab => tab.id === this.currentId);
+            const tabs = this.displayed(), index = tabs.findIndex(tab => tab.id === this.currentId);
             const next = tabs[(index + (event.shiftKey ? tabs.length - 1 : 1)) % tabs.length];
-            if (next) this.run(this.actions.activate(next.id));
+            if (next) this.run(this.requestActivate(next.id));
         } else if (event.shiftKey && event.key.toLowerCase() === 't') {
             event.preventDefault(); this.run(this.windows?.registry.reopen() ?? this.reopen());
         }

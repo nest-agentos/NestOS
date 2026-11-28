@@ -204,6 +204,7 @@ export interface WorkbenchConfig {
     /** Scope ID 用于多实例隔离 (localStorage key, modal ID 等) */
     scopeId?: string;
     editorFactory?: EditorFactory;
+    defaultWindowId?: string;
     editorConfig?: Partial<EditorOptions> & {
         refreshFileMetadata?: boolean;
         canCreateEntries?: boolean;

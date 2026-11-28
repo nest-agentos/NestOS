@@ -146,7 +146,9 @@ it('routes a real vfs-ui tree to chat, Task history and the Session mapped file 
         expect(main.querySelector<HTMLAnchorElement>('a[download]')?.download).toBe('document.pdf');
         expect(createURL).toHaveBeenCalledOnce();
         await workbench.openResource(id); expect(revokeURL).not.toHaveBeenCalled();
-        main.querySelector<HTMLButtonElement>(`[data-tab-id="/${id}/files/workspace/document.pdf"] .workbench-tabs__close`)!.click();
+        expect(main.querySelector('[data-tab-id="workbench"][data-resource$="/document.pdf"]')).not.toBeNull();
+        expect(main.querySelector(`[data-tab-id="${id}"].is-active`)).not.toBeNull();
+        main.querySelector<HTMLButtonElement>(`[data-tab-id="workbench"] .workbench-tabs__close`)!.click();
         await vi.waitFor(() => expect(revokeURL).toHaveBeenCalledWith('blob:test-preview'));
         await root.driver.createDirectory({ parentPath: '/home/admin', name: 'extra' });
         await repository.updateManifest(id, { currentBranch: 'experiment' });

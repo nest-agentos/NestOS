@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
 import { WorkbenchTabs } from '../src/workbench/tabs';
+import { WorkbenchWindows } from '../src/workbench/windows';
 import { WorkbenchSidebar } from '../src/workbench/sidebar';
 import { createDirectoryList, refreshDirectoryList, refreshDirectorySelection } from '../src/workbench/directory-list';
 import { readWorkbenchSnapshot, type WorkbenchSnapshot } from '../src/workbench/state';
@@ -551,4 +552,57 @@ it('moves one editable draft label between desktop and mobile navigation without
         expect(label.value).toBe('Keep title'); expect(label.closest('.workbench-compact-navigation')).not.toBeNull();
         media.matches = false; handlers.forEach(run => run()); expect(label.parentElement).toBe(header);
     } finally {close(); await tabs.destroy(); vi.unstubAllGlobals();}
+});
+
+it('opens notebook files through one default window and preserves pinned resources and failed saves', async () => {
+    const {manager} = await createVFS({rootBackend: new MemoryBackend()});
+    const fs = await manager.openFileSystem('/');
+    for (const owner of ['a', 'b']) {
+        await fs.driver.createDirectory({parentPath: '/', name: owner});
+        await fs.driver.createDirectory({parentPath: '/' + owner, name: 'notes'});
+        await fs.driver.createFile({parentPath: '/' + owner + '/notes', name: 'same.md', content: owner});
+    }
+    for (const name of ['third.md', 'fourth.md', 'failure.md']) await fs.driver.createFile({parentPath: '/', name, content: name});
+    const main = document.createElement('main'), sidebar = document.createElement('aside');
+    document.body.append(sidebar, main);
+    const flush = vi.fn(async () => {}), destroy = vi.fn(async () => {});
+    const factory = vi.fn(async (mount: HTMLElement, options: {initialContent: string}) => {
+        if (options.initialContent === 'failure.md') throw new FSError('EIO', 'Could not load note');
+        mount.textContent = options.initialContent;
+        return {flushPendingSave: flush, destroy};
+    });
+    const set = vi.fn(async () => {}).mockRejectedValueOnce(new FSError('EIO', 'Pin write failed'));
+    const registry = new WorkbenchWindows(undefined, {set, list: async () => [], navigate: async () => {}});
+    const workbench = new Workbench({files: {fs, cwd: '/'}, sidebarContainer: sidebar, editorContainer: main,
+        editorFactory: factory as never, defaultWindowId: 'notebook',
+        windows: {registry, id: 'notes', isActive: () => true, navigate: async () => {}}});
+    const active = () => main.querySelector<HTMLElement>('.workbench-tabs__tab.is-active')!;
+    const pin = () => active().querySelector<HTMLButtonElement>('.workbench-tabs__pin')!.click();
+    try {
+        await workbench.start();
+        pin();
+        expect(active().dataset.tabId).toBe('notebook');
+        await expect(workbench.openFile('/a/notes/same.md')).rejects.toThrow('Pin write failed');
+        expect(active().querySelector('[aria-pressed="true"]')).not.toBeNull();
+        expect(workbench.getActiveFilePath()).toBeNull();
+        await workbench.openFile('/a/notes/same.md');
+        expect(active().dataset.tabId).toBe('notebook-notes-same.md');
+        await workbench.openFile('/b/notes/same.md');
+        expect(active().dataset.tabId).toBe('notebook');
+        pin();
+        await vi.waitFor(() => expect(active().dataset.tabId).toBe('notebook-notes-same.md~%2Fb%2Fnotes%2Fsame.md'));
+        await workbench.openFile('/third.md');
+        await workbench.openFile('/fourth.md');
+        expect(active().dataset.tabId).toBe('notebook');
+        expect(main.querySelector('[data-tab-id][data-resource="/third.md"]')).toBeNull();
+        expect(destroy).toHaveBeenCalledTimes(2);
+        flush.mockRejectedValueOnce(new Error('Disk full'));
+        await expect(workbench.openFile('/third.md')).rejects.toThrow('Disk full');
+        await expect(workbench.openFile('/failure.md')).rejects.toThrow();
+        expect(workbench.getActiveFilePath()).toBe('/fourth.md');
+        expect(main.querySelector('.workbench-tabs__panel:not([hidden]) .session-editor-mount')?.textContent).toBe('fourth.md');
+        await workbench.openFile('/a/notes/same.md');
+        expect(active().dataset.tabId).toBe('notebook-notes-same.md');
+        expect(factory).toHaveBeenCalledTimes(6);
+    } finally { await workbench.destroy(); await manager.dispose(); }
 });

@@ -433,10 +433,13 @@ it('places Dream between Favorites and Files and opens only the selected project
     const list = vi.fn(async () => ({items: [], scanned: 0, truncated: false}));
     const workbench = createTestWorkbench({sidebar, container: main, repository, files, projects, directoryMounts: mounts,
         kernel: {onChanged: () => () => {}, async *listSessions() {}} as never,
-        factory: async () => ({destroy() {}}) as never, onSelect() {},
+        factory: async () => ({destroy() {}}) as never, fileFactory: async () => ({destroy() {}}) as never, onSelect() {},
         projectDream: {service: {list} as unknown as DreamService, openSession: vi.fn(), openTask: vi.fn(), openDecision: vi.fn()}});
     try {
         await workbench.start();
+        const defaultTab = () => main.querySelector<HTMLElement>('[data-tab-id="workbench"]')!;
+        defaultTab().querySelector<HTMLButtonElement>('.workbench-tabs__pin')!.click();
+        expect(defaultTab().querySelector('[aria-pressed="true"]')).not.toBeNull();
         expect(sidebar.querySelector('[data-item-id^="@dream/"]')).toBeNull();
         await workbench.openResource(folderBrowserPath(first.path));
         const firstDream = projectDreamResource(first.project.id);
@@ -449,8 +452,20 @@ it('places Dream between Favorites and Files and opens only the selected project
         await vi.waitFor(() => expect(main.querySelector('[data-dream-page]')).not.toBeNull());
         expect(workbench.getActiveResourceId()).toBe(firstDream);
         expect(list.mock.calls).toEqual([[first.project.id]]);
+        expect(main.querySelector(`[data-tab-id="workbench-dream-${first.project.id}"] [aria-pressed="true"]`)).not.toBeNull();
         await workbench.openResource(projectDreamResource(second.project.id));
-        await vi.waitFor(() => expect(list.mock.calls).toEqual([[first.project.id], [second.project.id]]));
+        expect(defaultTab().dataset.resource).toBe(projectDreamResource(second.project.id));
+        const workspace = await projects.openWorkspace(second.path);
+        try { await workspace.fs.driver.createFile({parentPath: '/workspace', name: 'probe.md', content: 'probe'}); }
+        finally { await workspace.dispose(); }
+        const file = folderBrowserPath(second.path) + '/@files/probe.md';
+        await workbench.openResource(file);
+        expect(defaultTab().dataset.resource).toBe(file);
+        expect(main.querySelector(`.workbench-tabs__tab[data-resource="${projectDreamResource(second.project.id)}"]`)).toBeNull();
+        await workbench.openResource(projectDreamResource(second.project.id));
+        expect(defaultTab().dataset.resource).toBe(projectDreamResource(second.project.id));
+        expect(main.querySelector(`.workbench-tabs__tab[data-resource="${file}"]`)).toBeNull();
+        await vi.waitFor(() => expect(list.mock.calls).toEqual([[first.project.id], [second.project.id], [second.project.id]]));
         await vi.waitFor(() => expect(sidebar.querySelector(`[data-item-id="${projectDreamResource(second.project.id)}"]`)).not.toBeNull());
         expect(row()).toBeNull();
     } finally {

@@ -172,3 +172,28 @@ it('places pinned windows first and sorts each group by the selected timestamp',
     expect(chat.tabs.opened.querySelectorAll('[data-opened-id="second"] time[datetime]')).toHaveLength(3);
     await chat.tabs.destroy(); await toolbox.tabs.destroy();
 });
+
+it('keeps the pinned empty window when saving its first resource bookmark fails', async () => {
+    const container = document.createElement('div');
+    const set = vi.fn(async () => { throw Object.assign(new Error('Pin write failed'), {code: 'EIO'}); });
+    const registry = new WorkbenchWindows(undefined, {list: async () => [], set, navigate: async () => {}});
+    const tabs = new WorkbenchTabs(container, {
+        defaultWindow: {id: 'notebook', title: 'Notebook'},
+        activate: async id => { tabs.activate(id); }, dispose: async () => {}, empty: () => {}, error: () => {},
+    }, [{id: 'notebook', title: 'Notebook', pinned: true}, {id: '/legacy.md', title: 'Legacy', pinned: true}],
+    {registry, id: 'notes', isActive: () => true, navigate: async () => {}});
+    try {
+        const empty = tabs.current!;
+        expect(empty.id).toBe('notebook');
+        expect(empty.pinned).toBe(true);
+        const candidate = await tabs.open('/docs/one.md', 'One', false, true);
+        await expect(tabs.commitDefault(candidate, 'docs-one.md')).rejects.toThrow('Pin write failed');
+        await tabs.discardCandidate(candidate, empty);
+        expect(tabs.current).toBe(empty);
+        expect(registry.items().map(item => [item.id, item.resource, item.pinned])).toEqual([
+            ['notebook', 'notebook', true], ['/legacy.md', '/legacy.md', true],
+        ]);
+        expect(set).toHaveBeenCalledOnce();
+        expect(tabs.snapshot().map(item => item.id)).toEqual(['notebook', '/legacy.md']);
+    } finally { await tabs.destroy(); }
+});

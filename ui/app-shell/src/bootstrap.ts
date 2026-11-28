@@ -585,6 +585,7 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
             editorFactory: factory,
             studyGeneration: {recovery: studyDraftStore(elementId), ...studyGeneration(backend, services.sessionRepository), sources: studySources(services, workspaces.filter(workspace => workspace.mentionAble || workspace.workspaceName === 'notes').map(workspace => ({id: workspace.workspaceName, label: workspace.title || workspace.workspaceName, files: async () => workspace.files?.fs ?? vfs.openFileSystem(workspaceRoot(workspace.workspaceName))}))), ...(plugins?.includes('cloze:cloze') && !options.studyGeneration?.prompts ? {loadPrompts: () => loadStudyPrompts(backend)} : {}), ...options.studyGeneration},
             scopeId:       elementId, deferNavigation: !!initialResource,
+            defaultWindowId: wsConfig.workspaceName === 'notes' ? 'notebook' : undefined,
             uiPersistence, workbenchState, windows: windowBinding,
             fileTypes,
             uiOptions,

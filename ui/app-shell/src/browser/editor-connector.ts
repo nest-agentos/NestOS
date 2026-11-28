@@ -1,7 +1,7 @@
 import {navigateWorkspaceBack} from '../navigation/page-history';
 import {createRecoverableFileEditor} from './file-recovery';
 import { showNameDialog } from '../files/project-dialog';
-import { t, FILE_BROWSER_ICONS, FILE_ICONS, randomUUID, type NavigationRequest } from '@nestos/common';
+import { createModuleLogger, t, FILE_BROWSER_ICONS, FILE_ICONS, randomUUID, type NavigationRequest } from '@nestos/common';
 import { directoryBulkActions } from '../workbench/vfs-actions';
 import { watchDirectoryList } from '../workbench/directory-watch';
 import type { EditorFactory, IEditor, EditorHostContext } from '@nestos/ui-common-adapter';
@@ -17,6 +17,7 @@ import { WorkbenchTabs, type WorkbenchTab } from '../workbench/tabs';
 import { WorkbenchSidebar } from '../workbench/sidebar';
 import { createDirectoryList, refreshDirectoryList, relocateDirectoryList, watchDirectorySelection } from '../workbench/directory-list';
 import type { WorkbenchStatePort } from '../workbench/state';
+import { fileWindowLabel } from '../workbench/window-identity';
 import { fileDirectoryBreadcrumbs } from '../workbench/directory-breadcrumbs';
 
 export interface ConnectOptions<Node extends VFSNodeUI = VFSNodeUI> {
@@ -28,6 +29,7 @@ export interface ConnectOptions<Node extends VFSNodeUI = VFSNodeUI> {
     files?: FileSystemContext;
     sidebarContainer?: HTMLElement;
     emptyMessage?: string;
+    defaultWindowId?: string;
     workbenchState?: WorkbenchStatePort;
     windows?: import('../workbench/windows').WorkbenchWindowBinding;
     refreshFileMetadata?: boolean;
@@ -35,7 +37,19 @@ export interface ConnectOptions<Node extends VFSNodeUI = VFSNodeUI> {
     navigationLabel?: string;
     onBeforeNavigate?(): void;
     onResourceRelocated?(path: string): void;
+    onResourceActivated?(path: string | null): void;
     [key: string]: any;
+}
+const fileOpenLog = createModuleLogger('file-window');
+function logFileOpen(trace: {operationId: string; started: number}, stage: 'flush' | 'editor', failure?: {error: unknown}): void {
+    const fields = {operationId: trace.operationId, stage, durationMs: Math.round(performance.now() - trace.started)};
+    if (!failure) {
+        fileOpenLog.debug('file.open', {...fields, result: 'success'});
+        return;
+    }
+    const code = (failure.error as {code?: unknown})?.code;
+    fileOpenLog.warn('file.open', {...fields, result: 'failure', code: typeof code === 'string' && /^[A-Z][A-Z_0-9]{0,79}$/.test(code)
+        ? code : stage === 'flush' ? 'FILE_SAVE_FAILED' : 'FILE_EDITOR_OPEN_FAILED'});
 }
 interface OpenView { node: VFSNodeUI; editor?: IEditor; lease?: EditorLease; cancel?: () => void }
 const replacePrefix = (path: string, old: string, next: string) => path === old || path.startsWith(old + '/') ? next + path.slice(old.length) : path;
@@ -43,7 +57,7 @@ const replacePrefix = (path: string, old: string, next: string) => path === old 
 /** Each open file owns its editor and save coordinator independently of navigation. */
 export function connectEditorLifecycle(vfs: VFSUIShell, engine: IFileSystem, container: HTMLElement,
     factory?: EditorFactory, options: ConnectOptions = {}): (() => Promise<void>) & { whenReady(): Promise<void>; refreshDirectory(): Promise<void>; setVisible(visible: boolean): Promise<void>; openDirectory(path: string): Promise<void>; openResource(path: string, mode?: 'edit' | 'render'): Promise<void>; getActiveResourceId(): string | null; assertRecovery(): void; captureRecovery(): unknown; restoreRecovery(state: unknown): void; suspendForRecovery(): void } {
-    const { resolveEditor, onEditorCreated, files = { fs: engine, cwd: '/' }, sidebarContainer, workbenchState, windows, emptyMessage, navigationLabel, onBeforeNavigate, saveDebounceMs: _debounce, ...extra } = options;
+    const { resolveEditor, onEditorCreated, files = { fs: engine, cwd: '/' }, sidebarContainer, workbenchState, windows, emptyMessage, defaultWindowId, navigationLabel, onBeforeNavigate, saveDebounceMs: _debounce, ...extra } = options;
     if (files.fs !== engine) throw new Error('Editor file context differs from its file tree');
     const revisions = new Map<string, string | undefined>();
     const loads = new LatestViewLoad(), pending = new Set<Promise<void>>();
@@ -55,9 +69,14 @@ export function connectEditorLifecycle(vfs: VFSUIShell, engine: IFileSystem, con
     const tabs = new WorkbenchTabs<OpenView>(container, {
         toggleSidebar: () => vfs.toggleSidebar(),
         navigation: navigationLabel,
+        defaultWindow: defaultWindowId ? {id: defaultWindowId, title: navigationLabel ?? t('project.files')} : undefined,
+        showEmpty: async () => {
+            onBeforeNavigate?.(); loads.cancel();
+            await openingTail; await flush(tabs.current?.value?.editor); pendingItem = undefined;
+        },
         describe: async tab => ({ location: tab.id }),
         activate: async id => { if (id === '/') await openDirectory(id); else await openResource(id); }, dispose: disposeTab,
-        empty: () => { placeholder(); onEditorCreated?.(null); }, error: report,
+        empty: () => { placeholder(); onEditorCreated?.(null); options.onResourceActivated?.(null); }, error: report,
         changed: () => sidebar?.save(tabs.snapshot()),
     }, workbenchState?.load()?.tabs, windows);
     if (sidebarContainer) sidebar = new WorkbenchSidebar(sidebarContainer, tabs.opened, workbenchState, navigationLabel, tabs.windowManagement);
@@ -162,26 +181,69 @@ export function connectEditorLifecycle(vfs: VFSUIShell, engine: IFileSystem, con
         }
         if (!loads.isCurrent(load) || closed) { await view.editor?.destroy(); return; }
         load.check(); view.cancel = loads.detach(load); tab.value = view; bind(tab, view);
-        onEditorCreated?.(view.editor ?? null);
     }
-    async function select({ item }: { item?: VFSNodeUI }, reload = false): Promise<void> {
-        pendingItem = item; if (!visible || closed) return;
+    let openingTail = Promise.resolve();
+    function select({item}: {item?: VFSNodeUI}): Promise<void> {
+        pendingItem = item;
+        if (!visible || closed) return Promise.resolve();
         onBeforeNavigate?.();
         const load = loads.begin();
-        try { await flush(tabs.current?.value?.editor); } catch (error) { report(error); return; }
-        if (!loads.isCurrent(load)) return;
-        if (!item) { if (!tabs.current?.value) placeholder(); return; }
-        if (item.type === 'file' && tabs.current?.value?.node.type === 'directory') tabs.keep(tabs.current.id);
-        const existing = tabs.get(item.id);
-        if (existing?.value && !reload) { tabs.activate(item.id); await existing.value.editor?.activate?.(); await refreshDirectoryList(existing.panel); onEditorCreated?.(existing.value.editor ?? null); return; }
-        if (existing && reload) await tabs.close(existing.id, false);
-        const preview = options.virtualViews?.find(view => view.id === item.id)?.preview ?? true;
-        const tab = await tabs.open(item.id, item.metadata.title || item.id, preview);
-        if (!loads.isCurrent(load)) return;
-        const task = new Promise<void>(resolve => setTimeout(resolve, 0)).then(() => create(tab, item, load)).catch(error => {
-            if (loads.isCurrent(load)) { tab.panel.replaceChildren(); report(error); }
+        if (!defaultWindowId) return openItem(item, load).catch(report);
+        const work = openingTail.then(async () => {
+            const finish = workbenchState?.begin?.();
+            try {
+                await openItem(item, load);
+                if (item && !load.signal.aborted && tabs.current?.value?.node.id === item.id) options.onResourceActivated?.(item.id);
+            } finally { finish?.(); }
         });
-        pending.add(task); void task.finally(() => pending.delete(task)); await task;
+        openingTail = work.catch(() => {});
+        return work;
+    }
+    async function openItem(item: VFSNodeUI | undefined, load: ViewLoad): Promise<void> {
+        if (!loads.isCurrent(load)) return;
+        const origin = tabs.current;
+        const trace = {operationId: randomUUID(), started: performance.now()};
+        try { await flush(origin?.value?.editor); }
+        catch (error) {
+            if (defaultWindowId && loads.isCurrent(load)) pendingItem = origin?.value?.node;
+            logFileOpen(trace, 'flush', {error});
+            throw error;
+        }
+        if (!loads.isCurrent(load)) return;
+        if (!item) { if (!origin?.value) placeholder(); return; }
+        const virtual = options.virtualViews?.find(view => view.id === item.id);
+        const label = defaultWindowId && item.type === 'file' && !virtual ? fileWindowLabel(item.id) : undefined;
+        if (item.type === 'file' && origin?.value?.node.type === 'directory') tabs.keep(origin.id);
+        const existing = tabs.get(item.id);
+        if (existing?.value) {
+            tabs.activate(item.id);
+            await existing.value.editor?.activate?.();
+            await refreshDirectoryList(existing.panel);
+            if (label && (!existing.defaultLabel || !existing.pinned)) await tabs.commitDefault(existing, label);
+            onEditorCreated?.(existing.value.editor ?? null);
+            return;
+        }
+        const tab = await tabs.open(item.id, item.metadata.title || item.id, virtual?.preview ?? true, !!label);
+        const task = prepareItem(tab, item, load, trace, origin, label);
+        pending.add(task); try { await task; } finally { pending.delete(task); }
+    }
+    async function prepareItem(tab: WorkbenchTab<OpenView>, item: VFSNodeUI, load: ViewLoad, trace: {operationId: string; started: number},
+        origin?: WorkbenchTab<OpenView>, label?: string): Promise<void> {
+        try {
+            await create(tab, item, load);
+            if (!tab.value) { await tabs.discardCandidate(tab, origin); return; }
+            if (label) await tabs.commitDefault(tab, label);
+            onEditorCreated?.(tab.value?.editor ?? null);
+            logFileOpen(trace, 'editor');
+        } catch (error) {
+            const cancelled = load.signal.aborted;
+            await tabs.discardCandidate(tab, origin);
+            if (cancelled || closed) return;
+            logFileOpen(trace, 'editor', {error});
+            if (!label) tab.panel.replaceChildren();
+            else if (pendingItem === item) pendingItem = origin?.value?.node;
+            throw error;
+        }
     }
     function relocate(oldPath: string, newPath: string): void {
         const operationId = randomUUID(), started = Date.now();
@@ -197,7 +259,7 @@ export function connectEditorLifecycle(vfs: VFSUIShell, engine: IFileSystem, con
                 if (view.node.type === 'directory') relocateDirectoryList(tab.panel, next, title, fileDirectoryBreadcrumbs(next, t('project.files')));
             }
             revisions.set(next, revisions.get(tab.id)); revisions.delete(tab.id);
-            tabs.rename(tab.id, next, title); tabs.location(next, next); count++;
+            tabs.location(tab.id, next); tabs.rename(tab.id, next, title, tab.defaultLabel ? fileWindowLabel(next) : undefined); count++;
         }
         if (pendingItem) {
             const next = replacePrefix(pendingItem.id, oldPath, newPath);
@@ -219,7 +281,7 @@ export function connectEditorLifecycle(vfs: VFSUIShell, engine: IFileSystem, con
     }));
     placeholder();
     const dispose = async () => {
-        closed = true; lifetime.abort(); loads.cancel(); unsubscribe.forEach(fn => fn()); await Promise.allSettled(pending);
+        closed = true; lifetime.abort(); loads.cancel(); unsubscribe.forEach(fn => fn()); await openingTail; await Promise.allSettled(pending);
         sidebar?.save(tabs.snapshot()); await tabs.destroy(); sidebar?.destroy();
     };
     async function openDirectory(path: string): Promise<void> {

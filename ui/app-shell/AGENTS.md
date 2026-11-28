@@ -110,6 +110,7 @@ const factory = factories[strategyType] ?? defaultEditorFactory;
 - vfs-ui 内部 DOM/CSS 由库维护；宿主只使用 appearance、NodePresentation、toolbarOptions.variant 和公开 CSS 变量。移动端正文切换订阅 VFS_DOM_EVENTS.resourceActivated，不能依赖内部类名或模拟点击。
 - 项目进入文件复用单侧栏；`ProjectNavigation` 投影当前项目目录、收藏与会话，目录详情和编辑标签位于 `workbench/`。`ProjectFileView` 只保留收藏导航的选择兼容提示；收藏解析在 `openFavorite` 完成。
 - `WorkbenchTabs` 保留每个标签的编辑器 DOM；修改将预览转为保持打开，固定标签受批量关闭保护。`WorkbenchSidebar` 管理互斥导航视图、窗口入口与可访问宽度分隔线；普通单视图工作区只显示标题，布局/非预览标签通过宿主 workbenchPort 存到 etc:/ui。关闭先完成保存，失败保留编辑器及文件租约。
+- 笔记和工作台分别启用 `notebook` 与 `workbench` 默认窗口。切换文件或工作台梦境时，先保存原编辑器，目标就绪后再替换未固定窗口。固定后的窗口 ID 按文件目录和名称生成，同名时用完整路由区分。窗口列表、历史、快照和书签使用资源路由定位，打开会话沿用独立标签与会话身份。
 - 项目与工具箱分别通过 `createProjectModule` / `createToolboxModule` 装配，返回统一 WorkspaceModule；bootstrap 只消费工作区能力，不用具体工作台类做 instanceof 判断。模块销毁同时释放目录投影和事件订阅，动态移除与应用退出共用一次释放。
 - `loadWorkspace()` 包含去重 — 并发加载同一工作区共享同一个 Promise (`pendingLoads`)
 - 正常 Web/HTTP/Tauri 入口启用 startPage，默认 #/start；显式深链和旧别名保留。onShellReady 在路由绑定后关闭全局提示，不等待工作区加载。工作区和资源加载分开，最新导航代次决定正文打开，隐藏模块不能改写 URL；失败局部重试，部分初始化资源由独立 cleanupGroup 释放。

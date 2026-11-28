@@ -10,7 +10,7 @@ export interface WorkbenchSnapshot {
     navigationCollapsed?: boolean;
     openedCollapsed?: boolean;
     drawerCollapsed?: Record<string, boolean>;
-    tabs?: (WindowTimes & { id: string; title: string; pinned: boolean; conversationId?: string; context?: string; location?: string })[];
+    tabs?: (WindowTimes & { id: string; title: string; pinned: boolean; defaultLabel?: string; conversationId?: string; context?: string; location?: string })[];
 }
 export interface WorkbenchStatePort {
     load(): WorkbenchSnapshot | undefined;
@@ -23,8 +23,8 @@ export function readWorkbenchSnapshot(value: unknown): WorkbenchSnapshot | undef
     const data = value as WorkbenchSnapshot;
     if (data.version !== 1) return;
     const tabs = Array.isArray(data.tabs) ? data.tabs.filter(tab => tab && typeof tab.id === 'string' && typeof tab.title === 'string' && typeof tab.pinned === 'boolean')
-        .map(({ id, title, pinned, conversationId, context, location, ...times }) => ({ id, title, pinned, ...readWindowTimes(times),
-            ...(typeof conversationId === 'string' ? { conversationId } : {}), ...(typeof context === 'string' ? { context } : {}), ...(typeof location === 'string' ? { location } : {}) })) : [];
+        .map(({ id, title, pinned, defaultLabel, conversationId, context, location, ...times }) => ({ id, title, pinned, ...readWindowTimes(times),
+            ...(typeof defaultLabel === 'string' ? { defaultLabel } : {}), ...(typeof conversationId === 'string' ? { conversationId } : {}), ...(typeof context === 'string' ? { context } : {}), ...(typeof location === 'string' ? { location } : {}) })) : [];
     const number = (value: unknown, min: number, max: number) => typeof value === 'number' && Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : undefined;
     return { version: 1, width: number(data.width, 220, 600), sidebarView: typeof data.sidebarView === 'string' ? data.sidebarView : undefined, navigationHeight: number(data.navigationHeight, 20, 85),
         navigationCollapsed: data.navigationCollapsed === true, openedCollapsed: data.openedCollapsed === true,

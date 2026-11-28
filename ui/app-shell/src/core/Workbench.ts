@@ -122,9 +122,10 @@ export class Workbench {
                                 label: t('editor.studyCreate'), documents: {save: draft => this.createStudyFile(draft)}},
                         } : {});
                     } }] : [],
-                windows: config.windows,
+                windows: config.windows, defaultWindowId: config.defaultWindowId,
                 navigationLabel: config.uiOptions?.title ?? t('project.files'),
                 onBeforeNavigate: config.onBeforeNavigate,
+                onResourceActivated: config.defaultWindowId ? config.onSessionChange : undefined,
                 onResourceRelocated: path => (config.onResourceRelocated ?? config.onSessionChange)?.(path),
                 fileTypes: config.fileTypes,
                 resolveEditor: resolveFileEditor(config.fileTypes, config.customEditorResolver),
@@ -187,7 +188,7 @@ export class Workbench {
 
         this.vfsUI.on('sessionSelected', (payload: { item?: { id: string } }) => {
             const sessionId = payload.item?.id ?? null;
-            if (this.config.onSessionChange) {
+            if (!this.config.defaultWindowId && this.config.onSessionChange) {
                 this.config.onSessionChange(sessionId);
             }
         });
@@ -286,7 +287,8 @@ export class Workbench {
         }
     }
     private async openDirectory(path: string): Promise<void> {
-        await this.lifecycleUnsubscribe.openDirectory(path); this.config.onSessionChange?.(path);
+        await this.lifecycleUnsubscribe.openDirectory(path);
+        if (!this.config.defaultWindowId) this.config.onSessionChange?.(path);
     }
     private async createInDirectory(path: string, type: 'file' | 'directory'): Promise<void> {
         await showNameDialog(t(type === 'file' ? 'project.createFile' : 'project.createFolder'), t('project.newFileName'), this.dialogs.signal, async name => {
@@ -309,7 +311,7 @@ export class Workbench {
     private async openFileInternal(nodeId: string, mode?: 'edit' | 'render'): Promise<void> {
         if (nodeId === '/') { await this.openDirectory(nodeId); return; }
         await this.lifecycleUnsubscribe.openResource(nodeId, mode);
-        this.config.onSessionChange?.(nodeId);
+        if (!this.config.defaultWindowId) this.config.onSessionChange?.(nodeId);
         if (this.navigationVisible) this.vfsUI.setSelection([nodeId]);
     }
 
