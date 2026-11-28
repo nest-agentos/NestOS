@@ -22,3 +22,5 @@ Project `_nestos/etc/deployment.json` schema 2 selects the registered service fo
 Enable `host_log = true` in the installed Cells service definition to mirror startup and runtime output to a private rotating archive on the Firecracker host. Operators and authorized collectors can read the archive when Cells or its VM is offline. See [Firecracker service logging](../fc-server/doc/services.md#停止销毁与日志).
 
 新的发布命令在构建前核对上一笔待确认操作。能确认原目标版本时记回原回执并继续，仍缺少运行证据时返回 `SERVICE_OPERATION_PENDING`，诊断中的 `pendingOperationId` 可用于查询原操作。
+
+受管 VM 的重启命令返回退出码 1 时，发布会在有限窗口内继续核对同一次操作，等待 systemd 自行恢复。只有新进程的运行版本与配置核对通过才继续下一个目标。

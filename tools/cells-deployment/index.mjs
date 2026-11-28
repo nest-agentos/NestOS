@@ -164,7 +164,23 @@ class CellsDeployment {
    if(this.ports.restart)await this.ports.restart();
    else await this.ports.command('sudo',['-n','systemctl','restart','firecracker-workload@'+this.options.vm+'.service'],120000);
    await this.observe(request);
-  }catch(error){log(request,'service.restart','failure',error.code??'SERVICE_SWITCH_UNKNOWN',started);}
+  }catch(error){
+   const code=error.code??'SERVICE_SWITCH_UNKNOWN';
+   if(code==='SERVICE_COMMAND_EXIT_1'&&this.ports.waitForRestart){
+    await this.observeSupervisorRecovery(request,code);
+    return;
+   }
+   log(request,'service.restart','failure',code,started);return;
+  }
+ }
+ async observeSupervisorRecovery(request,code){
+  const started=Date.now();
+  log(request,'service.restart.observe','start',code,started);
+  try{
+   const receipt=await this.ports.waitForRestart(()=>this.observe(request));
+   log(request,'service.restart.observe',receipt.state==='succeeded'?'success':receipt.state,
+    receipt.state==='running'?'SERVICE_RESTART_UNCONFIRMED':receipt.code,started);
+  }catch(error){log(request,'service.restart.observe','failure',error.code??'SERVICE_HEALTH_UNAVAILABLE',started);}
  }
  async installRelease(value,request,row,config){
   try{await this.install(value,request,config);return true;}

@@ -3,6 +3,7 @@ import {open,readFile} from 'node:fs/promises';
 import {constants} from 'node:fs';
 import path from 'node:path';
 import {promisify} from 'node:util';
+import {setTimeout as delay} from 'node:timers/promises';
 import {fail} from './artifact.mjs';
 
 const exec = promisify(execFile);
@@ -238,7 +239,19 @@ export function serviceStorage(run, directory = '/usr/local/lib/nestos/cells') {
 }
 
 export function guestStorage(options) {
-    return serviceStorage((args, input, maxBuffer) => guestCommand(options, args, input, maxBuffer));
+    return {...serviceStorage((args, input, maxBuffer) => guestCommand(options, args, input, maxBuffer)),
+        waitForRestart: waitForManagedRestart};
+}
+
+export async function waitForManagedRestart(observe, windowMs = 25_000, intervalMs = 1_000) {
+    const deadline = performance.now() + windowMs;
+    while (true) {
+        const result = await observe();
+        if (result.state !== 'running') return result;
+        const remaining = deadline - performance.now();
+        if (remaining <= 0) return result;
+        await delay(Math.min(intervalMs, remaining));
+    }
 }
 
 export async function readConfiguration(source, {privateFile = true} = {}) {

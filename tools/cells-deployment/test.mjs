@@ -7,7 +7,7 @@ import path from 'node:path';
 import {createServiceControl} from './index.mjs';
 import {packageArtifact,digest,save} from './artifact.mjs';
 import {build, deploymentConfiguration, parseRedeployArgs, readConfiguration, redeploy, sameDirectory, sameExecutablePath, targetsFor, vmConfigurationSource} from './redeploy.mjs';
-import {command, serviceStorage} from './guest.mjs';
+import {command, serviceStorage, waitForManagedRestart} from './guest.mjs';
 async function fixture(t){
  const root=await mkdtemp(path.join(tmpdir(),'cells-delivery-'));t.after(()=>rm(root,{recursive:true,force:true}));
  await mkdir(root+'/tools/cells/target/release',{recursive:true});await writeFile(root+'/tools/cells/target/release/cells','candidate');
@@ -49,6 +49,25 @@ test('reconciles the original operation before freezing the next expected versio
  assert.deepEqual(report.targets.map(row=>row.state),['unchanged']);
  assert.equal(restarts,1);
  assert.deepEqual(await f.control.inspectOperation(f.request.operationId),{state:'succeeded',version:f.request.targetVersion});
+});
+test('observes a managed supervisor retry without issuing another restart',async t=>{
+ const f=await fixture(t);await f.verify();
+ let restarts=0,probes=0;
+ f.ports.restart=async()=>{restarts++;throw Object.assign(Error(),{code:'SERVICE_COMMAND_EXIT_1'});};
+ f.ports.waitForRestart=observe=>waitForManagedRestart(()=>{
+  if(++probes===2)f.setHash(f.value.value.sha256);
+  return observe();
+ },500,1);
+ await f.control.submit(f.request);
+ assert.deepEqual(await f.control.inspect(f.request),{state:'succeeded',version:f.request.targetVersion});
+ assert.equal(restarts,1);assert.equal(probes,2);
+});
+test('leaves a failed managed restart pending when the observation window expires',async t=>{
+ const f=await fixture(t);await f.verify();
+ f.ports.restart=async()=>{throw Object.assign(Error(),{code:'SERVICE_COMMAND_EXIT_1'});};
+ f.ports.waitForRestart=observe=>waitForManagedRestart(observe,0);
+ await f.control.submit(f.request);
+ assert.deepEqual(await f.control.inspect(f.request),{state:'running'});
 });
 test('uses a SQLite OS lock to reject concurrent controllers before a second mutation',async t=>{
  const f=await fixture(t);await f.verify();let release;f.ports.command=()=>new Promise(resolve=>{release=resolve;});
