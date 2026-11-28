@@ -9,6 +9,7 @@ import {createSessionExecutionReader} from '../session/execution-facts';
 import {developmentCompletedResult} from '../presets/kanban-completed-result';
 import {kanbanHarnessTarget} from '../presets/kanban-harness-target';
 import {kanbanHarnessSettings} from '../presets/kanban-harness-settings';
+import {kanbanHarnessDefaults} from '../kanban/harness-defaults';
 import {NativeSessionRecovery} from '../projects/session-recovery';
 import {createTaskRecovery} from '../kanban/task-recovery';
 import {managedServiceDeployment,serviceDeploymentView} from '../presets/managed-service-deployment';
@@ -176,6 +177,7 @@ export interface ApplicationRuntime {
     /** Host-only Dream lifecycle; application transport does not expose this capability yet. */
     dream?: DreamHost;
     kanban?: import('@nestos/kanban/contracts').KanbanClient;
+    kanbanHarnessDefaults?:ReturnType<typeof kanbanHarnessDefaults>['api'];
     vfs: import('@nestos/vfs-core').IVFSManager;
     llmDriver: LLMDeviceDriver;
     agentService: VFSAgentService;
@@ -701,7 +703,9 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
         let wakeKanban = () => {};
         const developmentOperations = new OperationLifetime();
         cleanupFns.push(cleanupStep('developmentOperations.close', () => developmentOperations.close()));
-        const developmentBindings = remoteConnections && options.remoteSourceProvider ? {fs: systemFS, agents: agentService,
+        const harnessPolicy=remoteConnections?kanbanHarnessSettings(remoteConnections):undefined;
+        const harnessDefaults=harnessPolicy?kanbanHarnessDefaults(systemFS,harnessPolicy):undefined;
+        const developmentBindings = remoteConnections && options.remoteSourceProvider ? {fs: systemFS, agents: agentService, readHarnessDefault:harnessDefaults?.preferred,
             connections: executionConnections, remote: remoteConnections, provider: options.remoteSourceProvider, projects} : undefined;
         const decisionModules=approvalModules.map(({decide,...module})=>module);
         const observeApprovals=developmentBindings?observeDevelopmentPermissions(developmentBindings.remote,approvalModules,commandBus.execute.bind(commandBus)):undefined;
@@ -751,7 +755,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
         const executionResource=remoteConnections?kanbanSessionResource(projects,nativeSessionResource(kernelCore,projects,remoteConnections)):undefined;
         const kanban:import('@nestos/kanban').KanbanModuleHandle = await createPersonalKanban(systemFS, events, diagnostics, sessionRepository,createSessionActivityReader(kernelCore), independentCalls ? {
             prepareTarget:developmentBindings?kanbanHarnessTarget(developmentBindings):undefined,
-            boardSettings:remoteConnections?kanbanHarnessSettings(remoteConnections):undefined,
+            boardSettings:harnessPolicy,
             verifyNativeRestartIdle:remoteConnections?nativeRestartIdle(projects):undefined,
             sessionObservation:developmentBindings?developmentMessages.sessionObservation:undefined,
             taskRecovery:developmentBindings?context=>createTaskRecovery({...developmentBindings,...context,executionResource:executionResource!,
@@ -922,7 +926,7 @@ export async function createApplicationRuntime(options: ApplicationRuntimeOption
         diagnostics.record({module: 'application', operation: 'application.runtime', stage: 'ready', result: 'success', level: 'info'});
         return { sessionRecovery, events, diagnostics, serviceControl:options.serviceControl,vfs, llmDriver, agentService, configuration, sessionRepository, flowEngine, sessionFiles, directoryMounts, projects, executionConnections, toolConnections: options.toolConnections,
             flowInstallations: installations, toolPackages: installations.toolPackages, kernel, sessionManager, commandBus, independentCalls, runCatalog, quiesce, dispose, startBackground, prepareSession: async id => { await initializeProjects(); return recovery.acquireLater(id); },
-            projectSync, digitalTwin, dream: dreamHost, kanban, createView: createConversationView, openConversation: id => conversationContexts.open(id), conversationObservation: conversationContexts };
+            projectSync, digitalTwin, dream: dreamHost, kanban, kanbanHarnessDefaults:harnessDefaults?.api, createView: createConversationView, openConversation: id => conversationContexts.open(id), conversationObservation: conversationContexts };
     } catch (error) {
         await startup.close();
         for (const close of [...cleanupFns].reverse().concat([...sourceCleanupFns].reverse())) {

@@ -58,6 +58,14 @@ export interface WorkspaceFileSource {
 
 export interface LocalSnapshot { name: string; displayName: string; createdAt: number; size: number; description: string }
 export interface StorageUsage { usage?: number; quota?: number }
+export interface KanbanHarnessDefaults {
+    revision: number;
+    settings: Record<string, string>;
+}
+export interface SaveKanbanHarnessDefaults extends KanbanHarnessDefaults { operationId: string }
+export interface KanbanHarnessDefaultsView extends KanbanHarnessDefaults {
+    catalog: import('@nestos/kanban/contracts').KanbanBoardSettingsCatalog;
+}
 export interface SnapshotPort { estimate?(): Promise<StorageUsage | null>; listLocalSnapshots(): Promise<LocalSnapshot[]>; createSnapshot(): Promise<void>; restoreSnapshot(name: string): Promise<void>; deleteSnapshot(name: string): Promise<void>; factoryReset(): Promise<void> }
 export interface SettingsPort {
     estimateStorage(): Promise<StorageUsage | null>;

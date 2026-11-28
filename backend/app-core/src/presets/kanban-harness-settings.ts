@@ -10,6 +10,10 @@ import {requireValue} from '../kanban/validation';
 export type KanbanHarnessRole=KanbanHarnessStage;
 export const harnessSettingKey=(role:KanbanHarnessRole)=>'harness-'+role;
 const roles:KanbanHarnessRole[]=['decision','coordination','execution'];
+export type ReadHarnessDefault=(role:KanbanHarnessRole)=>Promise<string|undefined>;
+export async function preferredHarness(role:KanbanHarnessRole, settings?:Record<string,string>, readGlobal?:ReadHarnessDefault):Promise<string|undefined> {
+    return settings?.[harnessSettingKey(role)] || await readGlobal?.(role);
+}
 const decisionHarnessSystem=(role:KanbanHarnessRole)=>'nestos-decision-harness-'+role;
 export function decisionHarnessReferences(harnesses?:KanbanStageHarnesses,models?:KanbanStageHarnessModels):KanbanExternalReference[]{
     return roles.filter(role=>role!=='decision').flatMap(role=>{
@@ -94,7 +98,7 @@ export async function recordHarnessPreparation(journal:KanbanAutomationJournal,i
 }
 const log=createModuleLogger('kanban-harness-settings');
 export function kanbanHarnessSettings(remote:ProjectRemoteMountService){
-    const catalog=async(board:KanbanBoard):Promise<KanbanBoardSettingsCatalog>=>{
+    const catalog=async(board:Pick<KanbanBoard,'settings'>):Promise<KanbanBoardSettingsCatalog>=>{
         const profiles=await availableProfiles(remote);
         return {description:t('kanban.harnessSettingsHelp'),fields:roles.map(role=>{
             const value=board.settings?.[harnessSettingKey(role)];const choices=[{value:'',label:t('kanban.harnessDefault'),disabled:false},...profiles.values()];
@@ -102,7 +106,7 @@ export function kanbanHarnessSettings(remote:ProjectRemoteMountService){
             return {name:harnessSettingKey(role),label:t(('kanban.harnessRole.'+role) as Parameters<typeof t>[0]),choices};
         })};
     };
-    return {catalog,models:(projectId:string,profileId:string)=>projectHarnessModels(remote,projectId,profileId),validate:async(board:KanbanBoard,settings:Record<string,string>)=>{
+    return {catalog,models:(projectId:string,profileId:string)=>projectHarnessModels(remote,projectId,profileId),validate:async(board:Pick<KanbanBoard,'settings'>,settings:Record<string,string>)=>{
         requireValue(Object.keys(settings).every(key=>roles.some(role=>harnessSettingKey(role)===key)),'KANBAN_SETTINGS_UNKNOWN_FIELD');
         const view=await catalog(board);
         for(const field of view.fields){const value=settings[field.name]??'';

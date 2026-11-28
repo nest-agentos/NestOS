@@ -1,0 +1,21 @@
+.model-defaults-tabs {
+    display: flex;
+    gap: 8px;
+    padding: 12px 20px 0;
+    border-bottom: 1px solid var(--st-border-color, var(--border-color, #e5e7eb));
+}
+
+.model-defaults-tabs > button {
+    min-height: 44px;
+    padding: 0 14px;
+    color: inherit;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    background: transparent;
+    cursor: pointer;
+}
+
+.model-defaults-tabs > button[aria-selected="true"] {
+    border-bottom-color: var(--st-color-primary, #3b82f6);
+    font-weight: 600;
+}

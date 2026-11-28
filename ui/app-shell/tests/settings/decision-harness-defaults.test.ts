@@ -1,46 +1,70 @@
 // @vitest-environment jsdom
-import {expect, it, vi} from 'vitest';
-import {createSettingsFactory, type SettingsFactoryOptions} from '@nestos/app-settings';
-import {mountDecisionHarnessSettings} from '../../src/kanban/model-defaults-section';
+import {expect,it,vi} from 'vitest';
+import {createSettingsFactory,type SettingsFactoryOptions} from '@nestos/app-settings';
+import {mountKanbanHarnessSettings} from '../../src/kanban/model-defaults-section';
 
-it('edits the chosen board’s decision default through the existing revision-checked command', async () => {
-    const board = {id:'board', title:'Board', revision:7, settings:{'harness-decision':'codex', 'harness-execution':'dsh'}};
-    const service = {
-        catalog: vi.fn(async () => [board, {id:'other', title:'Other'}]),
-        boardSettings: vi.fn(async () => ({fields:[
-            {name:'harness-decision', label:'Decision', choices:[
-                {value:'', label:'Auto'}, {value:'codex', label:'Codex'}, {value:'agy', label:'Antigravity'},
-            ]},
-            {name:'harness-execution',label:'Execution',choices:[]},
-        ]})),
-        execute: vi.fn(async () => ({...board, revision:8})).mockRejectedValueOnce(Object.assign(new Error('Unknown receipt'), {
-            code:'ETIMEDOUT', outcome:'unknown',
-        })),
+const choices=[{value:'',label:'Auto'},{value:'codex',label:'Codex'},{value:'agy',label:'Antigravity'}];
+const catalog={fields:['decision','coordination','execution'].map(role=>({name:'harness-'+role,label:role,choices}))};
+const board={id:'board',title:'Board',revision:7,settings:{'harness-decision':'codex','harness-execution':'agy'}};
+
+async function fixture(){
+    const service={
+        catalog:vi.fn(async()=>[board]),
+        boardSettings:vi.fn(async()=>catalog),
+        execute:vi.fn(async()=>({...board,revision:8})),
     };
-    class Editor { async init(host: HTMLElement) { host.textContent = 'Models'; } async destroy() {} }
-    const section = vi.fn(async (host: HTMLElement) => mountDecisionHarnessSettings(host, service as never));
-    const factory = createSettingsFactory({llmUiEditors:{ModelDefaultsEditor:Editor}, modelDefaultsSection:section} as unknown as SettingsFactoryOptions);
-    const host = document.createElement('div');
-    const editor = await factory(host, {target:{kind:'configuration',id:'model-defaults'}} as never);
-    await vi.waitFor(() => expect(host.querySelector('option[value=board]')).toBeTruthy());
-    expect(host.firstElementChild?.querySelector('option[value=board]')).toBeTruthy();
-    expect(service.boardSettings).not.toHaveBeenCalled();
-    const select = host.querySelector('select')!;
+    const global={
+        readKanbanHarnessDefaults:vi.fn(async()=>({revision:2,settings:{'harness-decision':'agy'},catalog})),
+        saveKanbanHarnessDefaults:vi.fn(async(request)=>({...request,revision:3})).mockRejectedValueOnce(Object.assign(new Error('Unknown receipt'),{code:'ETIMEDOUT',outcome:'unknown'})),
+    };
+    class Editor {async init(host:HTMLElement){host.textContent='Models';} async destroy(){}}
+    const section=vi.fn(async(host:HTMLElement)=>mountKanbanHarnessSettings(host,service as never,global));
+    const factory=createSettingsFactory({llmUiEditors:{ModelDefaultsEditor:Editor},modelDefaultsSection:section} as unknown as SettingsFactoryOptions);
+    const host=document.createElement('div');
+    const editor=await factory(host,{target:{kind:'configuration',id:'model-defaults'}} as never);
+    const tabs=host.querySelectorAll<HTMLButtonElement>('[role=tab]');
+    const field=(role:string)=>host.querySelector<HTMLSelectElement>('select[name=setting-harness-'+role+']')!;
+    return {host,editor,tabs,field,service,global,section};
+}
+
+it('loads the Kanban tab on demand and retries one global save with all three roles',async()=>{
+    const f=await fixture();
+    expect(f.section).not.toHaveBeenCalled();
+    expect(f.tabs[0].getAttribute('aria-selected')).toBe('true');
+    f.tabs[1].click();
+    await vi.waitFor(()=>expect(f.field('decision')?.value).toBe('agy'));
+    expect(f.tabs[1].getAttribute('aria-selected')).toBe('true');
+    expect(f.service.boardSettings).not.toHaveBeenCalled();
+    f.field('coordination').value='codex'; f.field('execution').value='agy';
+    const form=f.field('decision').form!;
+    form.dispatchEvent(new Event('submit',{cancelable:true}));
+    await vi.waitFor(()=>expect(f.host.querySelector('[role=alert]')?.textContent).toContain('ETIMEDOUT'));
+    expect(f.field('decision').disabled).toBe(true);
+    form.dispatchEvent(new Event('submit',{cancelable:true}));
+    await vi.waitFor(()=>expect(f.field('decision').disabled).toBe(false));
+    expect(f.global.saveKanbanHarnessDefaults.mock.calls[1]).toEqual(f.global.saveKanbanHarnessDefaults.mock.calls[0]);
+    expect(f.global.saveKanbanHarnessDefaults).toHaveBeenCalledWith({operationId:expect.any(String),revision:2,
+        settings:{'harness-decision':'agy','harness-coordination':'codex','harness-execution':'agy'}});
+    f.tabs[0].click(); f.tabs[1].click();
+    expect(f.global.readKanbanHarnessDefaults).toHaveBeenCalledOnce();
+    await f.editor.destroy(); expect(f.host.children).toHaveLength(0);
+});
+
+it('edits per-board overrides without saving global defaults or execution limits',async()=>{
+    const f=await fixture(); f.tabs[1].click();
+    await vi.waitFor(()=>expect(f.host.querySelector('option[value=board]')).toBeTruthy());
+    const select=f.host.querySelector<HTMLSelectElement>('select[id^=model-defaults-harness-scope]')!;
     select.value='board'; select.dispatchEvent(new Event('change'));
-    const field = () => host.querySelector<HTMLSelectElement>('select[name=setting-harness-decision]')!;
-    await vi.waitFor(() => expect(field()?.value).toBe('codex'));
-    expect(host.querySelector('[name=setting-harness-execution], [name=executionSlots]')).toBeNull();
-    field().value = 'agy';
-    field().form!.dispatchEvent(new Event('submit', {cancelable:true}));
-    await vi.waitFor(() => expect(service.execute).toHaveBeenCalledWith('board', {
-        operationId: expect.any(String), expectedRevision:7,
-        command:{type:'configure-board-settings',settings:{'harness-decision':'agy','harness-execution':'dsh'}},
+    await vi.waitFor(()=>expect(f.field('decision')?.value).toBe('codex'));
+    expect(f.field('coordination').value).toBe('');
+    expect(f.field('execution').value).toBe('agy');
+    expect(f.host.querySelector('[name=executionSlots]')).toBeNull();
+    f.field('decision').value='agy';
+    f.field('decision').form!.dispatchEvent(new Event('submit',{cancelable:true}));
+    await vi.waitFor(()=>expect(f.service.execute).toHaveBeenCalledWith('board',{
+        operationId:expect.any(String),expectedRevision:7,
+        command:{type:'configure-board-settings',settings:{'harness-decision':'agy','harness-coordination':'','harness-execution':'agy'}},
     }));
-    await vi.waitFor(() => expect(host.querySelector('[role=alert]')?.textContent).toContain('ETIMEDOUT'));
-    expect(field().disabled).toBe(true);
-    field().form!.dispatchEvent(new Event('submit', {cancelable:true}));
-    await vi.waitFor(() => expect(field().disabled).toBe(false));
-    expect(service.execute.mock.calls[1]).toEqual(service.execute.mock.calls[0]);
-    await editor.destroy();
-    expect(host.children).toHaveLength(0);
+    expect(f.global.saveKanbanHarnessDefaults).not.toHaveBeenCalled();
+    await f.editor.destroy();
 });

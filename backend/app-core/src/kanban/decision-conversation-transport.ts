@@ -3,7 +3,7 @@ import {decisionSourceContext} from './decision-source-session';
 import {resolveDecisionModules} from './decision-modules';
 import {verifyDecisionDraftRemoval,unavailableDecisionReference} from './decision-conversation-availability';
 import {promptReferenceSections} from '../run/prompt-reference-sections';
-import {selectKanbanHarness,freezeKanbanHarness,harnessSettingKey,decisionHarnessProfile,decisionHarnessModel,requireHarnessModel,harnessSelectionFailure} from '../presets/kanban-harness-settings';
+import {selectKanbanHarness,freezeKanbanHarness,preferredHarness,decisionHarnessProfile,decisionHarnessModel,requireHarnessModel,harnessSelectionFailure} from '../presets/kanban-harness-settings';
 import {remoteSessionPath} from '@nestos/app-contracts';
 import {conversationPolicy,conversationInstruction} from './conversation-policy';
 import {randomUUID} from '@nestos/common';
@@ -46,7 +46,7 @@ async function prepare(options:DecisionConversationOptions,id:string,boardId:str
         requireValue(!record||record.kind==='decision'&&record.status!=='draft','DECISION_NOT_CONFIRMED');
         const old=await options.journal.get<{profileId:string}>('kanban-harness-choice:'+id);
         const explicit=coordination?decisionHarnessProfile({decision:{snapshot:record}},'coordination'):harnesses?.decision;
-        const selected=selectKanbanHarness(descriptor.profiles,workspaceId!,old?.profileId??explicit??board.settings?.[harnessSettingKey(role)]);
+        const selected=selectKanbanHarness(descriptor.profiles,workspaceId!,old?.profileId??explicit??await preferredHarness(role,board.settings,options.readHarnessDefault));
         const selection=coordination?decisionHarnessModel({decision:{snapshot:record}},'coordination'):models?.decision;
         await requireHarnessModel(client,selected,selection);
         const directory='_nestos/kanban/conversations/'+id,view=await options.projects.openWorkspace(carrier.path);

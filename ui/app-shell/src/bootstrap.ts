@@ -185,8 +185,11 @@ export async function initApp(options: AppOptions): Promise<AppHandle> {
     const deletionDialog = new ConfigurationDeletionDialog(services.configuration, undefined, ocr.deletionImpact);
     const settings = createSettingsAccess(backend, () => workspaces, {
         cells: services.projects.remoteMounts,
-        modelDefaultsSection: services.kanban?.boardSettings ? async container =>
-            (await import('./kanban/model-defaults-section')).mountDecisionHarnessSettings(container, services.kanban!) : undefined,
+        modelDefaultsSection: services.kanban?.boardSettings && backend.readKanbanHarnessDefaults && backend.saveKanbanHarnessDefaults ? async container =>
+            (await import('./kanban/model-defaults-section')).mountKanbanHarnessSettings(container, services.kanban!, {
+                readKanbanHarnessDefaults: () => backend.readKanbanHarnessDefaults!(),
+                saveKanbanHarnessDefaults: request => backend.saveKanbanHarnessDefaults!(request),
+            }) : undefined,
         ocr,
         agentService, connectionService: llmDriver, llmUiEditors: options.ui.llmUiEditors,
         excludedPages: toolboxId ? ['cells', 'providers', 'connections', 'mcp-servers', 'system-prompts'] : [],

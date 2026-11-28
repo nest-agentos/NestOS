@@ -22,6 +22,7 @@ export interface LocalApplicationServices {
     digitalTwin?: DigitalTwinService;
     dream?: import('./dream').DreamService;
     kanban?: import('@nestos/kanban/contracts').KanbanClient;
+    kanbanHarnessDefaults?: Required<Pick<import('./application-client').ApplicationBackend,'readKanbanHarnessDefaults'|'saveKanbanHarnessDefaults'>>;
     vfs: IVFSManager;
     llmDriver: IConnectionService & { init(): Promise<void> };
     agentService: ApplicationAgentPort;

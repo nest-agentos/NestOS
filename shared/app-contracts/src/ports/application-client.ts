@@ -81,6 +81,8 @@ export interface ApplicationBackend {
     listPinnedWindows?(): Promise<import('./pinned-windows').PinnedWindow[]>;
     setPinnedWindow?(change: import('./pinned-windows').PinnedWindowChange): Promise<void>;
     settings(sources: readonly SettingsWorkspaceSource[]): Promise<SettingsPort>;
+    readKanbanHarnessDefaults?(): Promise<import('../settings').KanbanHarnessDefaultsView>;
+    saveKanbanHarnessDefaults?(request: import('../settings').SaveKanbanHarnessDefaults): Promise<import('../settings').KanbanHarnessDefaults>;
     ocr(): Promise<OcrService>;
     initialFiles(): Promise<NestosInitialFiles>;
     projectSessions(): Promise<ProjectSessions>;

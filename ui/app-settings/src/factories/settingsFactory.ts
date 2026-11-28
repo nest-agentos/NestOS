@@ -20,6 +20,7 @@ import { RecoverySettingsEditor } from '../editors/RecoverySettingsEditor';
 import { LogSettingsEditor } from '../editors/LogSettingsEditor';
 import { SystemFSExploreEditor, type FileBrowserConnector } from '../editors/SystemFSExploreEditor';
 import { AppearanceSettingsEditor } from '../editors/AppearanceSettingsEditor';
+import {modelDefaultsTabs, type MountSettingsSection} from './model-defaults-tabs';
 
 /** Injected UI editors from @nestos/llm-ui-adapter (to avoid upward dependency). */
 export interface LLMUIEditors {
@@ -51,7 +52,7 @@ export interface SettingsFactoryOptions {
     diagnostics?: import('@nestos/app-contracts/services').ApplicationDiagnostics;
     mediaProbeExamples?: MediaProbeExamples;
     ocr?: import('@nestos/app-contracts/services').OcrControls;
-    modelDefaultsSection?: (container: HTMLElement) => Promise<{destroy(): void}>;
+    modelDefaultsSection?: MountSettingsSection;
     settingsService: SettingsService;
     agentService: IAgentManagementService;
     connectionService: IConnectionService;
@@ -107,25 +108,21 @@ export const createSettingsFactory = ({ settingsService, agentService, connectio
 
 async function mountModelDefaults(container: HTMLElement, editors: LLMUIEditors, service: IConnectionService, options: EditorOptions,
     mountSection: NonNullable<SettingsFactoryOptions['modelDefaultsSection']>, ocr: SettingsFactoryOptions['ocr']): Promise<IEditor> {
-    const models = document.createElement('div'), extension = document.createElement('div');
+    const tabs=modelDefaultsTabs(container,mountSection);
     const hadSettingsClass = container.classList.contains('settings-root');
     container.classList.add('settings-root', 'model-defaults-host');
-    container.replaceChildren(extension, models);
-    const editor = new editors.ModelDefaultsEditor(models, service, options, ocr);
-    const section = mountSection(extension);
+    const editor = new editors.ModelDefaultsEditor(tabs.models, service, options, ocr);
     const destroy = editor.destroy.bind(editor);
     editor.destroy = async () => {
         try { await destroy(); } finally {
-            (await section.catch(() => undefined))?.destroy();
+            tabs.destroy();
             container.classList.remove('model-defaults-host');
             if (!hadSettingsClass) container.classList.remove('settings-root');
-            models.remove();
-            extension.remove();
         }
     };
     try {
         // The injected settings editors expose their initialization hook.
-        await Promise.all([(editor as IEditor & {init(container: HTMLElement): Promise<void>}).init(models), section]);
+        await (editor as IEditor & {init(container: HTMLElement): Promise<void>}).init(tabs.models);
         return editor;
     } catch (error) {
         await editor.destroy();

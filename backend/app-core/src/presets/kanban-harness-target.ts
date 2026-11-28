@@ -13,10 +13,15 @@ export function kanbanHarnessTarget(options:Options):NonNullable<PersonalKanbanA
     return input=>developmentStage(input.dispatch.id,'harness.target',async()=>{
         const retry=harnessRetryTarget(input.dispatch.continuation?.preparation,'execution');
         const explicit=retry??decisionHarnessProfile(input.context,'execution'),selection=retry?undefined:decisionHarnessModel(input.context,'execution');
-        const frozen=await freezeKanbanHarness(journal,input.dispatch.id,input.board.id,'execution',explicit??input.board.settings?.[harnessSettingKey('execution')]??'');
+        const old=await journal.get<{profileId:string}>('kanban-harness-choice:'+input.dispatch.id);
+        const selected=old?.profileId??explicit??(input.board.settings?.[harnessSettingKey('execution')]||undefined);
+        const inherited=selected===undefined?await options.readHarnessDefault?.('execution'):undefined;
+        const readSource=()=>input.target.kind==='agent'?options.agents.getAgentRevision?.(input.target.id,input.target.version):undefined;
+        const inheritedSource=inherited?await readSource():undefined;
+        const preferred=inheritedSource?.definition.execution?.kind==='harness'?inherited:undefined;
+        const frozen=await freezeKanbanHarness(journal,input.dispatch.id,input.board.id,'execution',selected??preferred??'');
         if(!frozen)return input.target;
-        requireValue(input.target.kind==='agent','NATIVE_AGENT_REQUIRED');
-        const source=await options.agents.getAgentRevision?.(input.target.id,input.target.version);
+        const source=inherited?inheritedSource:await readSource();
         requireValue(source?.target.digest===input.target.digest&&source.definition.execution?.kind==='harness','NATIVE_AGENT_REQUIRED');
         const record=await options.connections.get(source.definition.execution.connectionId),template=record?.connection;
         requireValue(template&&template.enabled!==false,'NATIVE_CONNECTION_REQUIRED');
