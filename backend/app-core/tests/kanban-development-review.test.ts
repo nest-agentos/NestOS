@@ -6,16 +6,18 @@ import {createVFS, MemoryBackend} from '@nestos/vfs-core';
 import {KanbanAutomationJournal} from '@nestos/kanban/integration';
 import {readPrompt} from '../src/run/prompt-bundle';
 import {developmentReviewAdapter} from '../src/presets/kanban-development-review';
+import {prepareIntegrationWorkspace} from '../src/presets/kanban-integration-workspace';
 import {managementReviewAdapter} from '../src/presets/kanban-management-review';
-const mock = vi.hoisted(() => ({dirty: false, busy: false, context: true, rejectGit:false, ancestry:0, process: {}}));
+const mock = vi.hoisted(() => ({dirty: false, busy: false, context: true, integrationBound:false, rejectGit:false, ancestry:0, process: {}}));
+vi.mock('../src/presets/kanban-integration-workspace',()=>({prepareIntegrationWorkspace:vi.fn()}));
 vi.mock('../src/presets/kanban-development-workspace', () => ({developmentWorkspace: async (_remote, _provider, _project, work) => work(mock.process)}));
 vi.mock('@nestos/git-delivery/identity',()=>({readGitCommitIdentity:vi.fn(async()=>({name:'Project Automation',email:'automation@example.invalid'}))}));
 vi.mock('../src/presets/kanban-work-resource-execution', () => ({workResourceExecution: async () => mock.busy ? ['OPERATION_ORIGINAL_SESSION_BUSY'] : []}));
 vi.mock('@nestos/git-delivery/inspection', () => ({inspectWorktree: async () => ({exists: true, head: 'source-head', targetHead: 'target-head', targetBranch: 'main'})}));
 vi.mock('@nestos/git-delivery/repositories', () => ({gitWorkspace: async (_process,_directory,args) => {if(mock.rejectGit)throw Object.assign(new Error('Git should only run at execution boundaries'),{code:'TEST_GIT_DURING_OBSERVATION'});return {stdout: mock.dirty ? ' M file' : '',code:args[0]==='merge-base'&&args[2]==='source-head'?mock.ancestry:0};}, verifyWorktreeDelivery: async () => [{path: '.', fingerprint: 'delivery'}]}));
-vi.mock('../src/projects/harness-context-catalog', () => ({readContextCatalog: async (_kernel,sessionId) => {const id=sessionId==='manager-session'?'planning':'original';return {value:{bindings:{original:{id:'binding',branchId:'main',connectionId:'work-'+id,validity:mock.context?'valid':'invalid',nativeRef:{profileId:'codex',sessionId:id+'-native'},revision:7,generation:2}}}};}}));
+vi.mock('../src/projects/harness-context-catalog', () => ({readContextCatalog: async (_kernel,sessionId) => {const id=sessionId==='manager-session'?'planning':sessionId==='integration'?'integration':'original';if(id==='integration'&&!mock.integrationBound)return {value:{bindings:{}}};return {value:{bindings:{original:{id:'binding',branchId:'main',connectionId:'work-'+id,validity:mock.context?'valid':'invalid',nativeRef:{profileId:'codex',sessionId:id+'-native'},revision:7,generation:2}}}};}}));
 const closes: Array<() => Promise<void>> = [];
-afterEach(async () => {for (const close of closes.splice(0).reverse()) await close(); mock.dirty = mock.busy = mock.rejectGit = false; mock.context = true;mock.ancestry=0;});
+afterEach(async () => {for (const close of closes.splice(0).reverse()) await close(); mock.dirty = mock.busy = mock.rejectGit = false; mock.context = true;mock.integrationBound=false;mock.ancestry=0;});
 async function fixture(withExchange = false,serviceControl?:import('@nestos/app-contracts/services').RuntimeServiceControl) {
     const {manager} = await createVFS({rootBackend: new MemoryBackend()}); closes.push(() => manager.dispose()); const fs = await manager.openFileSystem('/');
     const journal = new KanbanAutomationJournal(fs, kanbanJournalOptions); await journal.open();
@@ -63,6 +65,23 @@ it('prepares merge analysis in the original logical Session and exact native con
     expect(await f.fs.driver.exists('/workspace/_nestos/worktrees/original/_nestos/kanban/review/analysis/manifest.json')).toBe(true);
     expect(f.calls.list).toHaveBeenCalledWith({sessionId: 'original'});
 });
+it('opens one dedicated integration Session for standalone delivery and resumes it for subsequent operations',async()=>{
+ const f=await fixture(),snapshot=await f.api.snapshot(f.board,f.item),directory='/workspace/_nestos/worktrees/integration';
+ const api=developmentReviewAdapter({...f.options,integrationWorkspace:{}} as never);
+ closes.push(()=>api.close!());
+ vi.mocked(prepareIntegrationWorkspace).mockResolvedValue({
+  id:'integration',record:{directory,projectId:'project',context:{board:{id:'board'},task:{id:'task'}},
+  policy:{profile:'development',commit:'changes',modules:[]}},tree:{id:'integration',directory},target:f.target,
+ } as never);
+ const first=await api.prepareAnalysis({id:'first-integration',board:f.board,item:f.item,snapshot});
+ expect(first).toMatchObject({expectedSessionId:'integration',overrides:{harnessConversation:{mode:'new'}}});
+ expect(f.channels.channel).toHaveBeenCalledWith('project','open',expect.objectContaining({scopeId:'first-integration',cwd:directory}));
+ mock.integrationBound=true;
+ const second=await api.prepareOperation!({id:'next-integration',action:'merge',board:f.board,item:f.item,snapshot});
+ expect(second).toMatchObject({expectedSessionId:'integration',overrides:{harnessConversation:{mode:'resume',bindingId:'binding'}}});
+ expect(vi.mocked(prepareIntegrationWorkspace).mock.calls.map(([, , scope])=>scope.sourceId)).toEqual(['original','original']);
+});
+
 it('allows unrelated target changes while refusing a busy original session or invalid native binding', async () => {
     const f = await fixture(), clean = await f.api.snapshot(f.board, f.item); mock.dirty = true;
     const snapshot = await f.api.snapshot(f.board, f.item);

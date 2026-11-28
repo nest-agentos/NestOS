@@ -7,6 +7,7 @@ export type ReviewAction = 'build' | 'deploy' | 'accept' | 'analyze' | 'merge';
 export interface ReviewSnapshot {version: string; sourceVersion: string; targetVersion: string; context: unknown}
 export type {MergePlan} from '@nestos/git-delivery/contracts';
 export interface ReviewJob extends KanbanOperationRecord {
+    integrationTarget?:string;
     scopeId?:string;
     action:ReviewAction;snapshot:ReviewSnapshot;
     managed?:import('@nestos/app-contracts/services').ServiceSwitchRequest;
@@ -21,6 +22,7 @@ export interface ReviewAdapter {
     ready?(board:KanbanBoard,item:KanbanItem):boolean;
     acceptanceCommands?(board:KanbanBoard,item:KanbanItem):Promise<import('@nestos/kanban/contracts').KanbanCommand[]>;
     cancel?(job:ReviewJob,operationId:string):Promise<'accepted'|'cancelled'|'unknown'>;
+    integrationTarget?(snapshot:ReviewSnapshot):string|undefined;
     gitIntegration?: {
         start(job: ReviewJob): Promise<'session' | 'applied'>;
         requiresProposal?(job:ReviewJob):Promise<boolean>;

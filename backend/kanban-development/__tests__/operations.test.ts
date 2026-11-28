@@ -115,6 +115,30 @@ it('owns repository scopes on one management task and preserves separate durable
     expect(next.scopes![1].view.operations.find(row=>row.id==='analyze')).toMatchObject({state:'ready'});
     expect((await f.journal.get<ReviewJob>(jobKey('repo-a-analysis')))?.scopeId).toBe('repo-a');
 });
+it.each([false,true])('serializes managed review admissions sharing a target and fences queued snapshots (%s)',async(drift)=>{
+    const f=await fixture(),scopeIds=['repo-a','repo-b'];
+    let firstDone=false;
+    f.submission.inspect.mockImplementation(async (request)=>({sessionId:'original',outcome:request.submission.id==='first'&&firstDone?'succeeded':'running'}));
+    const prepare=vi.fn(async ({id}:{id:string})=>({expectedSessionId:'original',expectedBranch:'main',submission:{id,source:{kind:'conversation' as const,ownerId:'original',id}}}));
+    f.options.scopes={describe:async()=>({scopes:scopeIds.map(id=>({id,label:id,contributors:[]}))}),
+        resolve:async()=>({deliveryPlan:async()=>({steps:['analyze','merge'],acceptance:'source'}),
+            adapter:{...f.adapter,prepareOperation:prepare,integrationTarget:()=> 'review-integration-target:shared'}})};
+    for(const [index,scopeId] of scopeIds.entries()){
+        const before=await f.api.itemOperations('board','task'),revision=before.scopes![index].view.revision;
+        await f.api.runItemOperation('board',{itemId:'task',scopeId,action:'analyze',operationId:index?'second':'first',expectedRevision:revision});
+    }
+    expect(prepare.mock.calls.map(([input])=>input.id)).toEqual(['first']);
+    const second=await f.journal.get<ReviewJob>(jobKey('second'));
+    expect(second).toMatchObject({phase:'prepared',code:'OPERATION_WAITING_INTEGRATION_TARGET'});
+    expect(second?.request).toBeUndefined();
+    firstDone=true;
+    if(drift)f.options.report=async job=>{if(job.id==='first'&&job.state==='succeeded')f.snapshot.version='new-target';};
+    await f.api.scan();
+    await f.api.scan();
+    expect(prepare.mock.calls.map(([input])=>input.id)).toEqual(drift?['first']:['first','second']);
+    if(drift)expect(await f.journal.get<ReviewJob>(jobKey('second'))).toMatchObject({phase:'settled',state:'failed',code:'MERGE_PLAN_SOURCE_CHANGED'});
+});
+
 it('keeps a lost admission reply unknown and only reconciles after restart', async () => {
     const f = await fixture(); await f.bind('build');
     f.published.start.mockRejectedValueOnce(Object.assign(new Error('Lost'), {code: 'TRANSPORT_DISCONNECTED'}));

@@ -1,5 +1,6 @@
+import {claimIntegrationTarget,releaseIntegrationTarget,waitingIntegrationTarget} from './item-operation-integration-queue';
 import {operationRuntimeVersion} from './item-operation-runtime';
-import {developmentAnalysisPolicy} from './development-operation-policy';
+import {developmentAnalysisPolicy,developmentDeliveryPolicy} from './development-operation-policy';
 import {invalidateReviewAnalysis,revalidateMergeAdmission,settleRejectedMerge} from '@nestos/kanban/integration';
 import {cancellationKey,pendingCancellation,blocksOperation,type ReviewCancellation} from '@nestos/kanban/integration';
 import {validateOperationResult} from '@nestos/git-delivery/results';
@@ -26,6 +27,10 @@ export async function prepareReviewJob(options: ReviewOperationsOptions, board: 
             const code=evidence?.sourceVersion!==snapshot.sourceVersion?'OPERATION_SOURCE_CHANGED_REANALYZE':'OPERATION_TARGET_CHANGED_REANALYZE';
             if(analysis)await invalidateReviewAnalysis({...options,policy:developmentAnalysisPolicy},board.id,item.id,analysis.id,code,request.operationId);requireValue(false,code);
         }
+    }
+    if((action==='analyze'||action==='merge')&&options.adapter.prepareOperation){
+        base.integrationTarget=options.adapter.integrationTarget?.(snapshot);
+        if(base.integrationTarget)return base;
     }
     const prepared = await prepareServiceOrSession(options,base,board,item,context);
     if(prepared)return prepared;
@@ -78,10 +83,13 @@ async function preparationStage<T>(options: ReviewOperationsOptions, operationId
 }
 export async function advanceReviewJob(options:ReviewOperationsOptions,job:ReviewJob,observeOnly=false,resumeIntegration=false):Promise<ReviewJob> {
     if(pendingCancellation(await options.journal.get<ReviewCancellation>(cancellationKey(job.id))))return (await options.journal.get<ReviewJob>(jobKey(job.id)))??job;
-    const rejected=await settleRejectedMerge({...options,policy:developmentAnalysisPolicy},job);if(rejected)return rejected;
+    const rejected=await settleRejectedMerge({...options,policy:developmentAnalysisPolicy},job);
+    if(rejected){await releaseIntegrationTarget(options,rejected);return rejected;}
     const resource=(job.snapshot.context as {worktreeId?:string})?.worktreeId;if(resource)await indexResourceJob(options.journal,resource,'review',job.id);
     if(job.action==='accept')return acceptReview(options,job);
-    return coordinateOperation({observeOnly,service:options.service,journal:options.journal,key:jobKey(job.id),record:job,port:{
+    const ready=job.integrationTarget&&job.phase==='prepared'&&!observeOnly?await prepareQueuedIntegration(options,job):job;
+    if(ready.phase==='settled'||ready.phase==='prepared'&&ready.integrationTarget&&!ready.request)return ready;
+    const next=await coordinateOperation({observeOnly,service:options.service,journal:options.journal,key:jobKey(job.id),record:ready,port:{
         start:async record=>{requireValue(!blocksOperation(await options.journal.get<ReviewCancellation>(cancellationKey(record.id))),'OPERATION_CANCELLING');const board=await options.service.read(record.boardId);
             if(board.executionControl?.paused)throw Object.assign(new Error('Delivery paused before admission'),{code:'AUTOMATIC_DELIVERY_PAUSED',executionOutcome:'not-started',retryable:true});
             requireValue(!board.lifecycle,'BOARD_STOPPING');
@@ -94,6 +102,32 @@ export async function advanceReviewJob(options:ReviewOperationsOptions,job:Revie
             if(blocksOperation(await options.journal.get<ReviewCancellation>(cancellationKey(record.id))))return {state:'unknown' as const,code:'OPERATION_CANCELLING'};
             return inspectReview(options,record,resumeIntegration);
         },validate:(record,output)=>validateReview(options,record,output),classify:reviewFailure,report:options.report}});
+    await releaseIntegrationTarget(options,next);
+    return next;
+}
+async function prepareQueuedIntegration(options:ReviewOperationsOptions,job:ReviewJob):Promise<ReviewJob> {
+    if(!await claimIntegrationTarget(options,job))return save(options,job,{...job,code:waitingIntegrationTarget});
+    if(job.request)return job;
+    const started=Date.now();
+    try {
+        const board=await options.service.read(job.boardId),{item,archive}=await options.service.item(job.boardId,job.itemId);
+        if(board.executionControl?.paused)return job;
+        requireValue(!board.lifecycle&&!archive&&!item.deletedAt&&item.status!=='cancelled'&&item.control?.action!=='cancel','TASK_CANCELLING');
+        if(job.action==='analyze'){
+            const actual=await options.adapter.snapshot(board,item);
+            requireValue(actual.version===job.snapshot.version,'MERGE_PLAN_SOURCE_CHANGED');
+        }else await revalidateMergeAdmission({...options,policy:developmentAnalysisPolicy},job);
+        const prepared=await prepareServiceOrSession(options,{...job,code:undefined},board,item,job.operationContext);
+        requireValue(prepared?.request,'OPERATION_ORIGINAL_SESSION_UNAVAILABLE');
+        return save(options,job,prepared);
+    }catch(error){
+        const code=safeCode(error,'OPERATION_PREPARATION_FAILED'),retry=developmentDeliveryPolicy.unstartedCodes.includes(code);
+        if(job.code!==code)options.log({operationId:job.id,boardId:job.boardId,itemId:job.itemId,stage:'integration.target.prepare',
+            result:'failure',code,durationMs:Date.now()-started});
+        if(retry)return save(options,job,{...job,code});
+        const failed=await save(options,job,{...job,phase:'settled',state:'failed',code});
+        await releaseIntegrationTarget(options,failed);return failed;
+    }
 }
 async function startGitIntegration(options: ReviewOperationsOptions, record: ReviewJob): Promise<boolean> {
     try {

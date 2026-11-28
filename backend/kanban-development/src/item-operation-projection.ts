@@ -1,3 +1,4 @@
+import {waitingIntegrationTarget} from './item-operation-integration-queue';
 import {t} from '@nestos/common';
 import {replacementMismatchCode,replacementTarget} from './item-operation-jobs';
 import type {KanbanItem,KanbanItemOperation,KanbanItemOperations} from '@nestos/kanban/contracts';
@@ -35,7 +36,7 @@ export function operation(context: Context, action: ReviewAction, active: boolea
             reason:recoveryReason(job),
             prompt:t('kanban.operationRecoveryPrompt',{operationId:job.id,source:job.snapshot.sourceVersion,target:job.snapshot.targetVersion})}}:{}),
         statusText:operationStatusText(context,action),progress:operationProgress(job,autoPending),
-        code:autoFailed?auto.code:job?.code==='WORKSPACE_CONTEXT_PENDING'?undefined:job?.code, runId: job?.id, sessionId: job?.sessionId??(action==='merge'?latest(context,'analyze')?.sessionId:undefined), configurable, binding, openSessionOnRun: agent || action === 'analyze',
+        code:autoFailed?auto.code:['WORKSPACE_CONTEXT_PENDING',waitingIntegrationTarget].includes(job?.code??'')?undefined:job?.code, runId: job?.id, sessionId: job?.sessionId??(action==='merge'?latest(context,'analyze')?.sessionId:undefined), configurable, binding, openSessionOnRun: agent || action === 'analyze',
         reason: job?.phase&&job.phase!=='settled'||autoPending ? undefined : enabled || finished ? undefined : t(!supported ? 'kanban.operationNeedsDelivery' : active ? 'kanban.operationBusy' : configurable && !binding ? 'kanban.operationNeedsFlow' : 'kanban.operationNeedsPrevious'),
         summary:action==='merge'&&integrationPaths(job?.result)?integrationPaths(job?.result):action==='analyze'||action==='merge'?plan?plan.summary+'\n'+t('kanban.operationVersions',{source:plan.sourceVersion,target:plan.targetVersion}):undefined:resultSummary(job?.result),
         fields: action === 'merge' && plan ? plan.conflicts.map(conflict => ({id: conflict.id, label: conflict.path + ' · ' + conflict.reason, choices: conflict.options})) : undefined,
@@ -81,6 +82,7 @@ function resultSummary(result: unknown): string | undefined {
     return [typeof value?.summary === 'string' ? value.summary.slice(0, 8000) : undefined, typeof value?.version === 'string' ? t('kanban.operationVersion', {version: value.version}) : undefined].filter(Boolean).join('\n') || undefined;
 }
 function operationProgress(job:ReviewJob|undefined,queued:boolean):KanbanItemOperation['progress'] {
+    if(job?.code===waitingIntegrationTarget)return {stage:'queued',label:t('kanban.errors.OPERATION_WAITING_INTEGRATION_TARGET'),requestedAt:job.createdAt};
     const stage=queued?'queued':!job||job.phase==='settled'?undefined:job.code==='WORKSPACE_CONTEXT_PENDING'?'waiting-context':job.state==='unknown'?'reconciling':job.phase==='prepared'?'preparing':'running';
     if(!stage)return;
     return {stage,label:t(('kanban.operationProgress.'+stage) as Parameters<typeof t>[0]),...(!queued&&job?.createdAt?{requestedAt:job.createdAt}:{})};

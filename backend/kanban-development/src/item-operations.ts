@@ -95,8 +95,9 @@ async function automaticView(options:ReviewOperationsOptions,board:string,item:s
 }
 
 function recommendedResolutions(context:Context):Record<string,string>|undefined {
-    if(!context.scoped)return;
-    const plan=latest(context,'analyze')?.result as MergePlan|undefined;
+    const analysis=latest(context,'analyze');
+    if(!context.scoped&&!analysis?.integrationTarget)return;
+    const plan=analysis?.result as MergePlan|undefined;
     if(!plan?.conflicts.length||!plan.conflicts.every(conflict=>conflict.resolution))return;
     return Object.fromEntries(plan.conflicts.map(conflict=>[conflict.id,conflict.resolution!.choice]));
 }

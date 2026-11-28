@@ -1,3 +1,5 @@
+import {prepareIntegrationWorkspace,type IntegrationWorkspacePorts} from './kanban-integration-workspace';
+import {managementPrompts} from '@nestos/kanban-development';
 import {kanbanResolvedPromptLimit} from './kanban-configuration-files';
 import {currentDeliveryRecord} from './kanban-delivery-options';
 import {reviewCancellation} from './kanban-review-cancellation';
@@ -11,7 +13,7 @@ import {verifyReadOnlyDelivery} from '@nestos/git-delivery/policy';
 import {deploymentProjectDigest,managedServiceDeployment,serviceDeploymentView,verifyManagedBuildArtifact} from './managed-service-deployment';
 import {operationReceipt} from '../run/operation-receipt';
 import {maintenanceInstruction} from './kanban-maintenance';
-import {journalCommand} from '@nestos/kanban/integration';
+import {indexResourceJob,journalCommand} from '@nestos/kanban/integration';
 import {DirectorySubscriptions} from '../run/directory-subscriptions';
 import {preloadCommitContexts} from './kanban-commit-query';
 import {developmentChannelExchange} from './kanban-channel-exchange';
@@ -44,6 +46,7 @@ import {channelDigest} from '../run/channel-protocol';
 import {workResourceExecution} from './kanban-work-resource-execution';
 
 export interface DevelopmentReviewOptions {
+    integrationWorkspace?:IntegrationWorkspacePorts;
     connections?:Parameters<typeof planningConversationControl>[0]['connections'];
     cancelSubmission?:ReturnType<typeof import('@nestos/llm-session').createSubmissionControl>;
     serviceControl?:import('@nestos/app-contracts/services').RuntimeServiceControl;
@@ -54,7 +57,7 @@ export interface DevelopmentReviewOptions {
 }
 type Options=DevelopmentReviewOptions;
 interface MaintenanceInput {extraPrompts?:import('../run/prompt-bundle').PromptFile[];deployment?:import('@nestos/app-contracts/services').RuntimeServiceDescriptor;id: string; board: KanbanBoard; item: KanbanItem; snapshot: ReviewSnapshot; action?: Exclude<import('@nestos/kanban-development').ReviewAction, 'accept'>; context?: unknown}
-interface ReviewResource {id: string; tree: PreparedWorktree; record: DevelopmentWorkspaceRecord; planningCall?:true}
+interface ReviewResource {id: string; tree: PreparedWorktree; record: DevelopmentWorkspaceRecord; planningCall?:true;sourceRecord?:DevelopmentWorkspaceRecord}
 export function developmentReviewAdapter(options: Options): ReviewAdapter {
     const watches = new DirectorySubscriptions();
     const watch = async (job: ReviewJob, terminal=false) => {
@@ -69,7 +72,7 @@ export function developmentReviewAdapter(options: Options): ReviewAdapter {
     };
     const managed=managedServiceDeployment(options.serviceControl,async item=>{const projectId=workProjectId(item);requireValue(projectId,'SINGLE_PROJECT_TASK_REQUIRED');return serviceDeploymentView(await options.projects.openWorkspace((await options.projects.get(projectId)).path),options.remote,projectId);},async job=>{requireValue((await snapshot(options,await options.service.read(job.boardId),(await options.service.item(job.boardId,job.itemId)).item)).version===job.snapshot.version,'OPERATION_SOURCE_CHANGED_REBUILD');});
     const cancel=options.cancelSubmission&&options.connections?reviewCancellation({journal:options.journal,submission:options.cancelSubmission,native:planningConversationControl({remote:options.remote,connections:options.connections},options.journal)}):undefined;
-    return {managed,cancel,gitIntegration:kanbanGitIntegration(options),runtimeVersion:async(_board,item)=>(await managed?.describe?.(item))?.version??options.runningVersion,runningVersion: () => options.runningVersion, supports: (board, item) => !!item.externalRefs?.some(ref => ref.system === 'nestos-worktree')||requiresDevelopmentProject(board)&&!!item.externalRefs?.some(ref=>ref.system==='nestos-remote-project'),
+    return {managed,cancel,integrationTarget:snapshot=>integrationTarget(options.remote,snapshot),gitIntegration:kanbanGitIntegration(options),runtimeVersion:async(_board,item)=>(await managed?.describe?.(item))?.version??options.runningVersion,runningVersion: () => options.runningVersion, supports: (board, item) => !!item.externalRefs?.some(ref => ref.system === 'nestos-worktree')||requiresDevelopmentProject(board)&&!!item.externalRefs?.some(ref=>ref.system==='nestos-remote-project'),
         acceptanceVersion:async(board,item,expectedVersion)=>{
             const current=await resource(options,item,board.id),target=await managed?.describe?.(item),proof=await options.serviceControl?.provenance?.(expectedVersion,target?.id);
             if(!target||!proof||proof.serviceId!==target.id||proof.version!==target.version||proof.version!==options.runningVersion)return;
@@ -87,6 +90,13 @@ export function developmentReviewAdapter(options: Options): ReviewAdapter {
         } : undefined,
         readOperation: async job => {const value = await readOperation(options, job); if (value !== undefined) await watches.close(job.id); return value;},
         readAnalysis: async job => {const value = await readAnalysis(options, job); if (value !== undefined) await watches.close(job.id); return value;}};
+}
+function integrationTarget(remote:ProjectRemoteMountService,snapshot:ReviewSnapshot):string {
+    const context=snapshot.context as {projectId?:string;targetBranch?:string};
+    requireValue(context.projectId&&context.targetBranch,'OPERATION_SCOPE_MISMATCH');
+    const root=remote.list(context.projectId).find(mount=>mount.at==='/');
+    requireValue(root?.serverId&&root.serverProjectId,'REMOTE_WORKSPACE_REQUIRED');
+    return 'review-integration-target:'+sha256HexSync(JSON.stringify([root.serverId,root.serverProjectId,context.targetBranch]));
 }
 async function resource(options: Options, item: KanbanItem, boardId: string): Promise<ReviewResource> {
     const refs = item.externalRefs?.filter(row => row.system === 'nestos-worktree') ?? [];
@@ -112,7 +122,34 @@ async function snapshot(options: Options, board: KanbanBoard, item: KanbanItem):
     });
 }
 async function prepareAnalysis(options: Options, input: MaintenanceInput): Promise<SubmissionRequest> {
-    return prepareReviewInResource(options,input,await resource(options,input.item,input.board.id));
+    const current=await resource(options,input.item,input.board.id);
+    return options.integrationWorkspace&&(!input.action||['analyze','merge'].includes(input.action))
+        ?prepareIndependentIntegration(options,input,current):prepareReviewInResource(options,input,current);
+
+}
+async function prepareIndependentIntegration(options:Options,input:MaintenanceInput,source:ReviewResource):Promise<SubmissionRequest> {
+    const original=(await options.calls.list({sessionId:source.id})).find(call=>call.input.request.expectedTarget);
+    const target=original?.input.request.expectedTarget;
+    requireValue(target&&original.callerState?.settled&&original.executionTree?.settled,'OPERATION_ORIGINAL_SESSION_UNAVAILABLE');
+    const work=await prepareIntegrationWorkspace(options.integrationWorkspace!,options.journal,
+        {board:input.board,item:input.item,sourceId:source.id,record:source.record,target});
+    const catalog=await readContextCatalog(options.kernel,work.id),candidates=Object.values(catalog.value.bindings);
+    const bindings=retainedExecutionContexts(candidates);
+    requireValue(bindings.length<=1&&(!candidates.length||bindings.length===1)&&bindings.every(binding=>binding.connectionId==='work-'+work.id&&binding.validity==='valid'),
+        'OPERATION_ORIGINAL_CONTEXT_UNAVAILABLE');
+    const binding=bindings[0];
+    if(binding)await requireIdleReviewSession(options,work.id);
+    requireValue(!binding?.activeOperation&&(!binding||binding.nativeRef?.sessionId),'OPERATION_ORIGINAL_SESSION_BUSY');
+    const phase=input.action??'analyze',name='management-integration-pre.md',content=managementPrompts[name];
+    const directory=work.record.directory+'/_nestos/kanban/review/'+input.id;
+    await freezeAnalysis(options,{...work,sourceRecord:source.record},{...input,extraPrompts:[{name,content,sha256:sha256HexSync(content),source:'nestos-management-policy'}]},
+        work.id,directory,binding?.nativeRef?.sessionId);
+    await indexResourceJob(options.journal,work.id,'review',input.id);
+    const text=phase==='analyze'?'Read `management-integration-pre.md` via `session_context` and follow the coordination analysis instructions.':maintenanceInstruction(phase,[name]);
+    return {expectedSessionId:work.id,expectedBranch:'main',expectedTarget:work.target,
+        target:{kind:work.target.kind,id:work.target.id,version:work.target.version},source:{kind:'composer',text,attachments:[],values:{}},
+        submission:{id:input.id,source:{kind:'conversation',ownerId:work.id,id:input.id}},overrides:{branchMode:'continue',
+            harnessConversation:binding?{mode:'resume',bindingId:binding.id,expectedBindingRevision:binding.revision,expectedGeneration:binding.generation}:{mode:'new'}}};
 }
 export async function prepareReviewInResource(options:Options,input:MaintenanceInput,current:ReviewResource):Promise<SubmissionRequest> {
     const calls = await options.calls.list({sessionId: current.id});
@@ -121,8 +158,8 @@ export async function prepareReviewInResource(options:Options,input:MaintenanceI
     const original = calls.find(row => row.receipt.executionSessionId && row.input.request.expectedTarget
         && (!current.planningCall||row.input.request.submission?.id===current.id));
     requireValue(original?.receipt.executionSessionId && calls.every(row => row.callerState?.settled && row.executionTree?.settled), 'OPERATION_ORIGINAL_SESSION_UNAVAILABLE');
-    const sessionId = original.receipt.executionSessionId, activity = await options.kernel.sessionActivity(sessionId);
-    requireValue(!Object.entries(activity.counts).some(([key, count]) => ['running', 'queued', 'created', 'waiting', 'blocked', 'paused'].includes(key) && count > 0), 'OPERATION_ORIGINAL_SESSION_BUSY');
+    const sessionId = original.receipt.executionSessionId;
+    await requireIdleReviewSession(options,sessionId);
     const branch = original.input.request.expectedBranch!, catalog = await readContextCatalog(options.kernel, sessionId);
     const bindings = retainedExecutionContexts(Object.values(catalog.value.bindings).filter(row => row.branchId === branch && row.connectionId === 'work-' + current.id));
     requireValue(bindings.length === 1 && bindings[0].validity === 'valid' && !bindings[0].activeOperation, 'OPERATION_ORIGINAL_CONTEXT_UNAVAILABLE');
@@ -135,8 +172,12 @@ export async function prepareReviewInResource(options:Options,input:MaintenanceI
         overrides: {...original.input.request.overrides, baseRoundId: undefined, newBranchName: undefined, branchMode: 'continue',
             harnessConversation: {mode: 'resume', bindingId: binding.id, expectedBindingRevision: binding.revision, expectedGeneration: binding.generation}}};
 }
+async function requireIdleReviewSession(options:Options,sessionId:string):Promise<void> {
+    const {counts}=await options.kernel.sessionActivity(sessionId);
+    requireValue(!Object.entries(counts).some(([key,count])=>['running','queued','created','waiting','blocked','paused'].includes(key)&&count>0),'OPERATION_ORIGINAL_SESSION_BUSY');
+}
 async function freezeAnalysis(options: Options, current: ReviewResource,
-    input: MaintenanceInput, sessionId: string, directory: string,nativeSessionId:string): Promise<void> {
+    input: MaintenanceInput, sessionId: string, directory: string,nativeSessionId?:string): Promise<void> {
     const existing=await options.journal.get<DevelopmentWorkspaceRecord>('development-workspace:'+input.id);
     const gitIdentity=existing?existing.gitIdentity:current.record.gitIdentity??(input.action==='merge'
         ?await developmentWorkspace(options.remote,options.provider,current.record.projectId,readGitCommitIdentity):undefined);
@@ -147,7 +188,7 @@ async function freezeAnalysis(options: Options, current: ReviewResource,
         const overlay = input.extraPrompts?.filter(file=>!basePolicy.prompts.files.some(saved=>saved.name===file.name)) ?? [];
         const policy=overlay.length?{...basePolicy,prompts:await freezePrompts(options.journal,'review-prompts:'+input.id,async()=>basePolicy.prompts.files,overlay,kanbanResolvedPromptLimit)}:basePolicy;
         const preload = await options.journal.get('merge-context-preload:' + input.id) ?? (!input.action || input.action === 'analyze' ? await developmentWorkspace(options.remote, options.provider, current.record.projectId, process =>
-            preloadCommitContexts({...options, record: current.record, process, targetHead: input.snapshot.targetVersion})) : {contexts: [], unresolved: []});
+            preloadCommitContexts({...options, record: current.sourceRecord??current.record, process, targetHead: input.snapshot.targetVersion})) : {contexts: [], unresolved: []});
         const context = await options.journal.update('merge-context-preload:' + input.id, old => old ?? preload);
         const contextText = JSON.stringify(context);
         await publishImmutableFile(view.fs, directory, 'commit-contexts.json', contextText);
