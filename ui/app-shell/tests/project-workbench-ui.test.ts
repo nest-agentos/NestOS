@@ -6,6 +6,7 @@ import { createVFS, MemoryBackend } from '@nestos/vfs-core';
 import { SessionRepository } from '@nestos/llm-session';
 import { DirectoryMountService, SessionFilesService, ProjectService, folderBrowserPath } from '@nestos/app-core';
 import { projectConversationEntryPath, projectConversationsPath } from '@nestos/app-contracts';
+import type { VFSUIShell } from '@nestos/vfs-ui';
 
 it('creates project Sessions from the selected project and edits its files in the same tree', async () => {
     const storage = new Map<string, string>();
@@ -37,7 +38,7 @@ it('creates project Sessions from the selected project and edits its files in th
         await workbench.start();
         await expect(workbench.createResource({ parentPath: '/' })).rejects.toThrow('请在项目内创建会话');
         await workbench.openResource('/');
-        const selector = sidebar.querySelector<HTMLSelectElement>('.workbench-project-navigation select')!;
+        const selector = sidebar.querySelector<HTMLSelectElement>('.vfs-scope-selector')!;
         expect(selector.value).toBe('/');
         const projectHeader = sidebar.querySelector<HTMLElement>(`[data-item-id="${projectPath}"] .vfs-directory-item__header`)!;
         expect(projectHeader).not.toBeNull(); projectHeader.click();
@@ -70,21 +71,18 @@ it('creates project Sessions from the selected project and edits its files in th
             expect(row.querySelector('.vfs-directory-item__icon')?.innerHTML).toBeTruthy();
         }
         const header = navigation.querySelector('.workbench-project-navigation')!;
-        expect([...header.querySelectorAll<HTMLButtonElement>('button')].filter(button => !button.closest('[hidden], details')).map(button => button.title))
-            .toEqual(['所有项目','新会话','项目设置']);
-        expect(header.querySelector('.vfs-toolbar-overflow [data-action="refresh"]')).not.toBeNull();
-        expect(header.querySelector('.vfs-toolbar-overflow [data-project-action="settings"]')).not.toBeNull();
-        expect([...header.querySelectorAll<HTMLElement>('[data-action]')].map(button => button.dataset.action))
-            .toEqual(['project-up', 'create-project', 'refresh', 'import', 'export']);
-        const createdProject = vi.spyOn(workbench as any, 'createProject').mockResolvedValue(undefined);
-        header.querySelector<HTMLButtonElement>('[data-action="create-project"]')!.click();
-        await new Promise(resolve => setTimeout(resolve, 0)); expect(createdProject).not.toHaveBeenCalled(); createdProject.mockRestore();
+        await vi.waitFor(() => {
+            expect(selector.value).toBe(projectPath);
+            expect(header.querySelector<HTMLButtonElement>('[data-action=project-up]')?.hidden).toBe(false);
+            expect(header.querySelector<HTMLButtonElement>('.workbench-project-navigation__create')?.hidden).toBe(false);
+            expect(header.querySelector<HTMLButtonElement>(':scope > [data-project-action=settings]')?.hidden).toBe(false);
+        });
+        expect(header.querySelector('[data-action=refresh]')).not.toBeNull();
+        expect(header.querySelector<HTMLButtonElement>('[data-action=create-project]')?.hidden ?? true).toBe(true);
         expect(navigation.querySelector('[data-directory-action]')).toBeNull();
-        expect(navigation.querySelectorAll('[data-action="import"]')).toHaveLength(1);
-        expect(navigation.querySelector('[data-action="import"]')?.closest('.workbench-project-navigation')).toBe(header);
         const imported = vi.spyOn(workbench as any, 'importSelection').mockResolvedValue(undefined);
         const exported = vi.spyOn(workbench as any, 'exportSelection').mockResolvedValue(undefined);
-        const more = header.querySelector<HTMLElement>('details > summary')!;
+        const more = header.querySelector<HTMLElement>('.workbench-project-navigation__menu > summary')!;
         for (const [action, command] of [['import', imported], ['export', exported]] as const) {
             more.click();
             const button = header.querySelector<HTMLButtonElement>(`details [data-project-action="${action}"]`)!;
@@ -189,10 +187,10 @@ it('creates project Sessions from the selected project and edits its files in th
         expect(chat.mock.calls.at(-1)![1].mountMoreMenu).toBeTypeOf('function');
         expect(sidebar.querySelector('.vfs-columns')).toBeNull();
         await workbench.openResource('/');
-        expect(sidebar.querySelector('.workbench-project-navigation select')?.value).toBe('/');
+        expect(selector.value).toBe('/');
         expect(navigation.textContent).toContain('Research');
         await workbench.openResource(projectPath + '/@files/renamed.txt');
-        expect(sidebar.querySelector('.workbench-project-navigation select')?.value).toBe('/');
+        expect(selector.value).toBe('/');
         expect(file).toHaveBeenCalledOnce();
         const linked = await projects.openFiles(other.path);
         await linked.fs.driver.createFile({ parentPath: '/', name: 'linked.md', content: '# Intro\nLinked content' }); await linked.dispose();
@@ -235,18 +233,19 @@ it('restores a bookmark inside an unreachable remote project without aborting bo
     try {
         await workbench.start();
         await expect(workbench.restoreResource(folderBrowserPath(remote.path))).resolves.toBeUndefined();
-        expect(main.inert).not.toBe(true);
+        const panel = () => main.querySelector<HTMLElement>('.workbench-tabs__panel:not([hidden])')!;
+        expect(panel().inert).not.toBe(true);
         const create = sidebar.querySelector<HTMLButtonElement>('.workbench-project-navigation__create');
         expect(create?.disabled).toBe(true);
         await expect(workbench.createResource({ parentPath: folderBrowserPath(remote.path) })).rejects.toThrow();
         await workbench.openResource(folderBrowserPath(remote.path) + '/@files');
-        expect(main.inert).toBe(false);
+        expect(panel().inert).not.toBe(true);
         expect(workbench.getActiveResourceId()).toBe(folderBrowserPath(remote.path) + '/@files');
         expect(main.textContent).toContain('远程文件无法连接');
         expect(main.textContent).toContain('ETIMEDOUT');
         expect([...main.querySelectorAll('button')].map(button => button.textContent)).toEqual(expect.arrayContaining([t('diagnostics.check'), t('diagnostics.projectStatus')]));
         await workbench.openResource(`${folderBrowserPath(await projects.sessionFolder(remote))}/${existing}`);
-        expect(main.inert).toBe(false);
+        expect(panel().inert).not.toBe(true);
         expect(workbench.getActiveResourceId()).toContain(existing);
     } finally {
         await workbench.destroy(); await mounts.dispose(); await files.dispose(); await repository.dispose(); await manager.dispose();

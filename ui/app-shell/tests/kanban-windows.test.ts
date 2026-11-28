@@ -41,6 +41,13 @@ async function deleteBoard(f: Awaited<ReturnType<typeof fixture>>) {
     await f.service.execute('b',{operationId:'delete-b',expectedRevision:(await f.service.read('b')).revision,command:{type:'delete-board'}});
 }
 async function idle(active: () => HTMLElement) {await vi.waitFor(() => expect(active().hasAttribute('aria-busy')).toBe(false));}
+const boardLogs = '/board/b/@log';
+async function openLogDraft(active: () => HTMLElement) {
+    active().querySelector<HTMLButtonElement>('[data-action=new-log]')!.click();
+    await vi.waitFor(() => expect(active().querySelector('form[data-form=record]')).not.toBeNull());
+    await idle(active);
+    return active();
+}
 it('pins a decision page from More and only reads saved pages when another device opens its window list', async () => {
     HTMLDialogElement.prototype.showModal ??= function () {this.open = true;};
     HTMLDialogElement.prototype.close ??= function () {this.open = false; this.dispatchEvent(new Event('close'));};
@@ -105,16 +112,18 @@ it('keeps filter, scroll and unsaved forms when switching windows and refuses to
     await f.workbench.openResource('/board/b/card', {newTab: true}); await f.workbench.openResource('/board/b');
     expect(f.active()).toBe(boardElement); expect(column.scrollTop).toBe(123);
     expect(boardElement.querySelector<HTMLInputElement>('[name=search]')!.value).toBe('A long');
-    boardElement.querySelector<HTMLButtonElement>('[data-action=new-item]')!.click(); await idle(f.active);
-    const title = boardElement.querySelector<HTMLInputElement>('[name=title]')!; title.value = 'Unsaved'; title.dispatchEvent(new Event('input', {bubbles: true}));
+    await f.workbench.openResource(boardLogs, {newTab: true});
+    const draft = await openLogDraft(f.active);
+    const title = draft.querySelector<HTMLInputElement>('[name=title]')!; title.value = 'Unsaved'; title.dispatchEvent(new Event('input', {bubbles: true}));
     await expect(f.workbench.openResource('/board/b/@decision')).rejects.toThrow(t('kanban.unsaved'));
-    await f.workbench.openResource('/board/b/card'); await f.workbench.openResource('/board/b');
-    expect(boardElement.querySelector<HTMLInputElement>('[name=title]')!.value).toBe('Unsaved');
-    expect(f.registry.items().find(item => item.id === '/board/b')!.dirty).toBe(true);
-    await expect(f.registry.items().find(item => item.id === '/board/b')!.close()).rejects.toThrow(t('kanban.unsaved'));
-    boardElement.querySelector<HTMLButtonElement>('[data-panel] .kanban__panel-back')!.click(); await idle(f.active);
-    await f.registry.items().find(item => item.id === '/board/b')!.close();
-    expect(f.registry.items().map(item => item.id)).toEqual(['/board/b/card']);
+    await f.workbench.openResource('/board/b/card'); await f.workbench.openResource(boardLogs);
+    expect(draft.querySelector<HTMLInputElement>('[name=title]')!.value).toBe('Unsaved');
+    expect(f.registry.items().find(item => item.id === boardLogs)!.dirty).toBe(true);
+    await expect(f.registry.items().find(item => item.id === boardLogs)!.close()).rejects.toThrow(t('kanban.unsaved'));
+    draft.querySelector<HTMLButtonElement>('[data-panel] [data-action=close-panel]')!.click(); await idle(f.active);
+    await f.registry.items().find(item => item.id === boardLogs)!.close();
+    expect(f.registry.items().map(item => item.id)).toEqual(expect.arrayContaining(['/board/b', '/board/b/card']));
+    expect(f.registry.items().some(item => item.id === boardLogs)).toBe(false);
 });
 it('marks hidden windows dirty without querying them until activated, and unregisters all window metadata', async () => {
     const f = await fixture('/board/b'); await f.workbench.openResource('/board/b/card', {newTab: true});
@@ -125,17 +134,17 @@ it('marks hidden windows dirty without querying them until activated, and unregi
 });
 
 it('keeps one VFS sidebar while switching and closing editors, including a dirty inspector', async () => {
-    const f = await fixture('/board/b');
+    const f = await fixture(boardLogs);
     const list = f.sidebar.querySelector('.vfs-node-list')!; expect(list).not.toBeNull();
     expect(f.sidebar.querySelector('.kanban__sidebar')).toBeNull(); expect(f.sidebar.textContent).toContain('Board');
-    f.active().querySelector<HTMLButtonElement>('[data-action=new-item]')!.click(); await idle(f.active);
+    await openLogDraft(f.active);
     const field = f.active().querySelector<HTMLInputElement>('[name=title]')!; field.value = 'Draft'; field.dispatchEvent(new Event('input', {bubbles: true}));
     expect(f.sidebar.inert).not.toBe(true);
     await f.workbench.openResource('/board/b/card', {newTab: true}); await f.workbench.openResource('/');
     expect(f.sidebar.querySelectorAll('.vfs-node-list')).toHaveLength(1); expect(f.sidebar.querySelector('.vfs-node-list')).toBe(list);
-    await f.workbench.openResource('/board/b'); expect(f.active().querySelector<HTMLInputElement>('[name=title]')!.value).toBe('Draft');
+    await f.workbench.openResource(boardLogs); expect(f.active().querySelector<HTMLInputElement>('[name=title]')!.value).toBe('Draft');
     f.active().querySelector<HTMLButtonElement>('[data-action=close-panel]')!.click(); await idle(f.active);
-    await f.registry.items().find(item => item.id === '/board/b')!.close(); expect(f.sidebar.textContent).toContain('Board');
+    await f.registry.items().find(item => item.id === boardLogs)!.close(); expect(f.sidebar.textContent).toContain('Board');
 });
 it('updates shared navigation after creating a board through its toolbar', async () => {
     const f = await fixture('/');
@@ -193,24 +202,23 @@ it('refreshes both sidebars and retires clean board and item tabs through the sh
 });
 
 it('preserves a deleted board draft, blocks submission and keeps it when returning to the catalog',async () => {
-    const f = await fixture('/board/b'); await subscribe(f);
-    f.active().querySelector<HTMLButtonElement>('[data-action=new-item]')!.click(); await idle(f.active);
-    const draft = f.active(), title = draft.querySelector<HTMLInputElement>('[name=title]')!;
+    const f = await fixture(boardLogs); await subscribe(f);
+    const draft = await openLogDraft(f.active), title = draft.querySelector<HTMLInputElement>('[name=title]')!;
     title.value = 'Keep this draft'; title.dispatchEvent(new Event('input',{bubbles:true}));
     await deleteBoard(f); const execute = vi.spyOn(f.service,'execute');
     await vi.waitFor(() => expect(draft.querySelector('[data-resource-unavailable]')).not.toBeNull());
-    expect(title.value).toBe('Keep this draft'); expect(f.registry.items().find(item => item.id === '/board/b')?.dirty).toBe(true);
-    draft.querySelector('form[data-form=item]')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})); await idle(f.active);
+    expect(title.value).toBe('Keep this draft'); expect(f.registry.items().find(item => item.id === boardLogs)?.dirty).toBe(true);
+    draft.querySelector('form[data-form=record]')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})); await idle(f.active);
     expect(execute).not.toHaveBeenCalled();
     draft.querySelector<HTMLButtonElement>('[data-action=unavailable-return]')!.click();
     await vi.waitFor(() => expect(f.workbench.getActiveResourceId()).toBe('/'));
     await vi.waitFor(() => expect(draft.hasAttribute('aria-busy')).toBe(false));
-    expect(title.value).toBe('Keep this draft'); expect(f.registry.items().find(item => item.id === '/board/b')?.dirty).toBe(true);
-    await f.workbench.openResource('/board/b');
+    expect(title.value).toBe('Keep this draft'); expect(f.registry.items().find(item => item.id === boardLogs)?.dirty).toBe(true);
+    await f.workbench.openResource(boardLogs);
     expect(title.value).toBe('Keep this draft');
     draft.querySelector<HTMLButtonElement>('[data-action=close-panel]')!.click();
-    await vi.waitFor(() => expect(f.registry.items().find(item => item.id === '/board/b')?.dirty).not.toBe(true));
-    await vi.waitFor(() => expect(f.registry.items().some(item => item.id === '/board/b')).toBe(false));
+    await vi.waitFor(() => expect(f.registry.items().find(item => item.id === boardLogs)?.dirty).not.toBe(true));
+    await vi.waitFor(() => expect(f.registry.items().some(item => item.id === boardLogs)).toBe(false));
 });
 
 it('does not retire a board when the catalog refresh fails',async () => {
@@ -223,20 +231,19 @@ it('does not retire a board when the catalog refresh fails',async () => {
 });
 
 it('waits for an in-flight submission to settle before retiring the deleted board',async () => {
-    const f = await fixture('/board/b'); await subscribe(f);
-    f.active().querySelector<HTMLButtonElement>('[data-action=new-item]')!.click(); await idle(f.active);
-    const draft = f.active();
-    for (const [name,value] of Object.entries({title:'Committed before deletion',responsibility:'Work',acceptance:'Done'})) {
-        const input = draft.querySelector<HTMLInputElement>(`[name=${name}]`)!; input.value = value; input.dispatchEvent(new Event('input',{bubbles:true}));
+    const f = await fixture(boardLogs); await subscribe(f);
+    const draft = await openLogDraft(f.active);
+    for (const [name,value] of Object.entries({title:'Committed before deletion',content:'Work completed'})) {
+        const input = draft.querySelector<HTMLInputElement | HTMLTextAreaElement>(`[name=${name}]`)!; input.value = value; input.dispatchEvent(new Event('input',{bubbles:true}));
     }
     let release!: () => void, committed = false;
     const held = new Promise<void>(resolve => {release = resolve;}), execute = f.service.execute.bind(f.service);
     vi.spyOn(f.service,'execute').mockImplementationOnce(async (...args) => {const result = await execute(...args); committed = true; await held; return result;});
-    draft.querySelector('[data-form=item]')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));
+    draft.querySelector('[data-form=record]')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));
     try {
         await vi.waitFor(() => expect(committed).toBe(true)); await deleteBoard(f);
         await vi.waitFor(() => expect(f.sidebar.querySelector('.vfs-node-list')!.textContent).not.toContain('Board'));
-        expect(draft.hasAttribute('aria-busy')).toBe(true); expect(f.registry.items().some(item => item.id === '/board/b')).toBe(true);
+        expect(draft.hasAttribute('aria-busy')).toBe(true); expect(f.registry.items().some(item => item.id === boardLogs)).toBe(true);
     } finally {release();}
     await vi.waitFor(() => expect(f.workbench.getActiveResourceId()).toBe('/'));
     expect(f.registry.items().some(item => item.id.startsWith('/board/b'))).toBe(false);
