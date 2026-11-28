@@ -28,3 +28,15 @@ it('does not accept a mismatched execution owner or fabricate an absent executio
  await expect(f.api.inspect(f.request)).rejects.toMatchObject({code:'SUBMISSION_EXECUTION_CONFLICT'});
  expect(f.submit).not.toHaveBeenCalled();
 });
+
+it('proves a stale binding rejection only for a single failed native admission',async()=>{
+ const f=fixture(),error={code:'CONTEXT_BINDING_CHANGED'},attempt={outcome:'failed'};
+ f.round.status='failed';f.task.program.kind='kernel-adapters.harness';
+ Object.assign(f.task.exit,{status:'failed',error});
+ const harness={request:{kind:'harness.execute'},status:'failed',error,attempts:[attempt]};
+ Object.assign(f.task.effects,{harness});
+ expect(await f.api.inspect(f.request)).toMatchObject({outcome:'failed',code:error.code,executionOutcome:'not-started'});
+ harness.attempts.unshift({outcome:'lost'});
+ expect(await f.api.inspect(f.request)).not.toHaveProperty('executionOutcome');
+ expect(f.submit).not.toHaveBeenCalled();
+});

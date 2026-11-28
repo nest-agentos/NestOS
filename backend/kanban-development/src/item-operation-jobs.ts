@@ -172,11 +172,8 @@ async function inspectReview(options:ReviewOperationsOptions,record:ReviewJob,re
     }
     const observation=await observeReview(options,record);
     const recover=observation.state==='unknown'&&(record.action==='deploy'||record.action==='build');
-    let output=(observation.state==='succeeded'||recover)&&record.request?await (options.adapter.readOperation??options.adapter.readAnalysis)(record):observation.output;
-    if(record.action==='build'&&(observation.state==='succeeded'||recover)&&output===undefined&&options.adapter.managed?.reuseBuild){
-        const {item}=await options.service.item(record.boardId,record.itemId);
-        output=await preparationStage(options,record.id,'service.artifact.recovery',()=>options.adapter.managed!.reuseBuild!(record,item));
-    }
+    const readResult=(observation.state==='succeeded'||recover)&&record.request;
+    let output=readResult?await reviewResult(options,record):observation.output;
     if(record.action==='merge'&&observation.state==='succeeded'&&(output as {status?:string}|undefined)?.status==='succeeded'
         &&options.adapter.gitIntegration?.publishProposal&&await options.adapter.gitIntegration.requiresProposal?.(record)){
         const board=await options.service.read(record.boardId),{item,archive}=await options.service.item(record.boardId,record.itemId);
@@ -190,6 +187,22 @@ async function inspectReview(options:ReviewOperationsOptions,record:ReviewJob,re
     const recovered=recover&&record.request&&receipt!==undefined&&(record.action==='build'||
         receipt.status==='succeeded'&&await operationRuntimeVersion(options,record.boardId,record.itemId)===receipt.version);
     return {...observation,...(recovered?{state:'succeeded' as const}:{}),executionId:observation.sessionId,output};
+}
+
+async function reviewResult(options:ReviewOperationsOptions,record:ReviewJob):Promise<unknown> {
+    const read=options.adapter.readOperation??options.adapter.readAnalysis,reuse=options.adapter.managed?.reuseBuild;
+    if(record.action!=='build'||!reuse)return read(record);
+    let unavailable:unknown;
+    try {
+        const receipt=await read(record);if(receipt!==undefined)return receipt;
+    }catch(error){
+        if(!['ECONNRESET','ECONNREFUSED','ENOTCONN','EHOSTUNREACH','ETIMEDOUT','EPIPE','SERVICE_STOPPING'].includes(safeCode(error,'')))throw error;
+        unavailable=error;
+    }
+    const {item}=await options.service.item(record.boardId,record.itemId);
+    const verified=await preparationStage(options,record.id,'service.artifact.recovery',()=>reuse(record,item));
+    if(verified===undefined&&unavailable)throw unavailable;
+    return verified;
 }
 /** Revalidate a settled mismatch against the original receipt without submitting a switch. */
 export async function recheckReplacement(options:ReviewOperationsOptions,job:ReviewJob):Promise<ReviewJob> {

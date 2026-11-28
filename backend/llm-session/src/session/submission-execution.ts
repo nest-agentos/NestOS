@@ -1,13 +1,13 @@
 import {hasFlowControlTree} from '@nestos/llm-flow/contracts';
 import {SessionCommand, type SubmissionRequest, type Round, type ISessionRepository} from '../contracts';
-import {taskExecutionStat, type Kernel} from '@nestos/durable-kernel';
+import {taskExecutionStat, type Kernel, type TaskRecord} from '@nestos/durable-kernel';
 import type {ICommandBus} from '../contracts';
 const failure=(code:string)=>Object.assign(new Error(code),{code});
 
 export interface SessionSubmissionOptions {contexts:{open(id:string):Promise<{commandBus:Pick<ICommandBus,'execute'>;dispose():Promise<void>}>}; repository: Pick<ISessionRepository, 'readDocument'>;
     kernel: Pick<Kernel,'inspectSession'>; ensureWritable?(sessionId: string): Promise<boolean>}
 function requireValue(value: unknown, code: string): asserts value {if (!value) throw failure(code);}
-export interface SessionSubmissionObservation {controlCapabilities?: {pause:'boundary'|'none';resume:boolean}; sessionId: string; outcome: 'running' | 'unknown' | 'succeeded' | 'failed' | 'cancelled'; code?: string}
+export interface SessionSubmissionObservation {controlCapabilities?: {pause:'boundary'|'none';resume:boolean}; sessionId: string; outcome: 'running' | 'unknown' | 'succeeded' | 'failed' | 'cancelled'; code?: string; executionOutcome?: 'not-started'}
 /** Recover the admitted Session and inspect durable facts without activating a view or replaying input. */
 export function createSessionSubmission(options: SessionSubmissionOptions) {
     const inspect = async (request: SubmissionRequest): Promise<SessionSubmissionObservation> => {
@@ -59,5 +59,14 @@ async function inspectSubmission(options: SessionSubmissionOptions, request: Sub
     if(!['completed','failed','cancelled'].includes(round.status))return {sessionId,controlCapabilities,outcome:'running',code:'SUBMISSION_SETTLEMENT_PENDING'};
     const outcome = task.exit.status === 'succeeded' ? 'succeeded' : task.exit.status === 'cancelled' ? 'cancelled' : 'failed';
     const code = (task.exit.error as {code?: string})?.code;
-    return {sessionId, controlCapabilities, outcome, ...(outcome === 'failed' ? {code: code && /^[A-Z][A-Z0-9_]{0,79}$/.test(code) ? code : 'SUBMISSION_EXECUTION_FAILED'} : {})};
+    return {sessionId, controlCapabilities, outcome, ...(outcome === 'failed' ? {code: code && /^[A-Z][A-Z0-9_]{0,79}$/.test(code) ? code : 'SUBMISSION_EXECUTION_FAILED',
+        ...(bindingRejectedBeforeDispatch(task)?{executionOutcome:'not-started' as const}:{})} : {})};
+}
+
+/** The first harness effect rejects a stale binding before submitting any native turn. */
+function bindingRejectedBeforeDispatch(task:TaskRecord):boolean {
+    const effect=task.effects.harness;
+    return task.program.kind==='kernel-adapters.harness'&&task.exit?.error?.code==='CONTEXT_BINDING_CHANGED'
+        &&effect?.request.kind==='harness.execute'&&effect.status==='failed'&&effect.error?.code==='CONTEXT_BINDING_CHANGED'
+        &&!effect.cleanupPending&&effect.attempts?.length===1&&effect.attempts[0].outcome==='failed'&&!effect.replayAuthorized;
 }

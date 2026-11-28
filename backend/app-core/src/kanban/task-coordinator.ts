@@ -10,21 +10,31 @@ import {readPlanningChannel} from '../run/planning-channel';
 interface Options extends PersonalKanbanAutomationOptions {service:KanbanService;journal:KanbanAutomationJournal;workLog?:KanbanWorkLog}
 export function taskCoordinator(options:Options) {
     if(!options.collaboration||!options.sessionChannel)return;
-    return createTaskCoordinator({service:options.service,journal:options.journal,prepare:(id,snapshot)=>prepare(options,id,snapshot),port:{
+    return createTaskCoordinator({service:options.service,journal:options.journal,prepare:(id,snapshot,previous)=>prepare(options,id,snapshot,previous),
+        canRefresh:async job=>{
+            const observed=await options.collaboration!.submission.inspect(job.request as SubmissionRequest);
+            return observed.outcome==='failed'&&observed.code==='CONTEXT_BINDING_CHANGED'&&observed.executionOutcome==='not-started';
+        },port:{
         start:async job=>{await options.collaboration!.submission.start(job.request as SubmissionRequest);},
         inspect:job=>inspect(options,job),
         validate:(job,output)=>validateCoordinationResult(output,job.snapshot.children,[...new Set((options.operationPlugins??[]).flatMap(plugin=>plugin.actions.filter(action=>action.coordination!==false).map(action=>action.id)))]),
-        classify:error=>({code:safeCode(error,'COORDINATION_FAILED'),disposition:(error as {executionOutcome?:string}).executionOutcome==='not-started'?'retry-unstarted':['COORDINATION_RESULT_INVALID','CHANNEL_RESULT_INVALID','CHANNEL_RESULT_CHANGED'].includes(safeCode(error,''))?'terminal':'unknown'}),
+        classify:classifyCoordination,
         report:async job=>{await options.notifyCoordination?.(job);if(job.phase!=='settled')return;const key='coordination-reported:'+job.id;if(await options.journal.get(key))return;
             await options.workLog?.append(options.service,job.boardId,job.itemId,{stage:'coordination.'+job.state,result:job.state==='succeeded'?'success':'failure',dispatchId:job.id,code:job.code,
                 references:job.sessionId?[{system:'nestos-coordination-session',id:job.sessionId,revision:job.id}]:[]});
             await options.journal.update(key,old=>old??true);},
     }});
 }
-async function prepare(options:Options,id:string,snapshot:CoordinationSnapshot) {
+function classifyCoordination(error:unknown):import('@nestos/kanban/integration').KanbanOperationFailure {
+    const code=safeCode(error,'COORDINATION_FAILED'),receipt=error as {executionOutcome?:string;retryable?:boolean};
+    if(receipt?.executionOutcome==='not-started')return {code,disposition:receipt.retryable?'retry-unstarted':'terminal'};
+    return {code,disposition:['COORDINATION_RESULT_INVALID','CHANNEL_RESULT_INVALID','CHANNEL_RESULT_CHANGED'].includes(code)?'terminal':'unknown'};
+}
+async function prepare(options:Options,id:string,snapshot:CoordinationSnapshot,previous?:CoordinationOperation) {
     const analysis=await currentAnalysis<IndependentCallInput>(options.journal,snapshot.boardId,snapshot.parent.id);
     requireValue(analysis?.input,'COORDINATION_SESSION_UNAVAILABLE');
     const original=await options.originalSession(analysis.input);
+    if(previous)assertSameCoordinationContext(previous.request as SubmissionRequest,original.request(id,''));
     const fixId=await options.journal.get<string>('fix-session:'+original.sessionId);
     const fix=fixId?await options.journal.get<{accepted?:boolean;state:string}>('fix:'+fixId):undefined;
     requireValue(!fix||fix.accepted||fix.state==='cancelled','COLLABORATION_IN_USE');
@@ -32,6 +42,14 @@ async function prepare(options:Options,id:string,snapshot:CoordinationSnapshot) 
     const context={...await workContext(options.journal,board,snapshot.parent),coordination:{automatic:true,...snapshot}};
     const instruction=await options.collaboration!.prepare({id,originId:analysis.id,...original,context,item:snapshot.parent,board});
     return original.request(id,instruction+' This is an automatic state event: publish a coordination result with ready=true; do not wait for user confirmation unless a real clarification is required.');
+}
+
+function assertSameCoordinationContext(previous:SubmissionRequest,current:SubmissionRequest):void {
+    const a=previous.overrides?.harnessConversation,b=current.overrides?.harnessConversation;
+    requireValue(a?.mode==='resume'&&b?.mode==='resume'&&a.bindingId===b.bindingId&&a.expectedGeneration===b.expectedGeneration
+        &&b.expectedBindingRevision>a.expectedBindingRevision&&previous.expectedSessionId===current.expectedSessionId
+        &&previous.expectedBranch===current.expectedBranch&&JSON.stringify(previous.expectedTarget)===JSON.stringify(current.expectedTarget),
+        'COORDINATION_CONTEXT_REPLACED');
 }
 async function inspect(options:Options,job:CoordinationOperation) {
     const request=job.request as SubmissionRequest,workspace=await options.journal.get<{projectId:string}>('development-workspace:'+job.id);
