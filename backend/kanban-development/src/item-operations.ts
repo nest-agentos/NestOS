@@ -49,7 +49,7 @@ export function createItemOperations(input: ReviewOperationsOptions) {
         settle:(board,item)=>settleDeliveryAcceptance(scoped,board,item),
         target:scoped.automaticTarget,plan:scoped.deliveryPlan,cleanup:(board,item,id)=>cleanupAfterSubmission(scoped,board,item,id),active:()=>!stopped,
         report:scoped.reportAutomatic,retryPrecondition:(board,item,action,code)=>recoverDeliveryPrecondition(scoped,board,item,action,code),
-        view:(board,item)=>queue(board,item,async()=>view(scoped,await load(scoped,board,item,true))),run:(board,request)=>queue(board,request.itemId,()=>run(scoped,board,request,'automatic'))});
+        view:(board,item)=>queue(board,item,()=>automaticView(scoped,board,item)),run:(board,request)=>queue(board,request.itemId,()=>run(scoped,board,request,'automatic'))});
     const automatic=createAutomatic(options);
     const contexts=async(board:string,item:string)=>{
         const route=await options.scopes?.describe(board,item),scopes=route?.scopes??[];
@@ -87,6 +87,18 @@ export function createItemOperations(input: ReviewOperationsOptions) {
                 execution: {id: job.id, purpose: job.action === 'analyze' ? 'execution' : 'finalization', state:job.code==='OPERATION_CANCELLED'?'cancelled':job.state === 'succeeded' ? 'completed' : job.state, code: job.code, createdAt: job.createdAt}}));
         },
         async quiesce() {stopped = true; await Promise.allSettled([...tails.values()]); await options.adapter.close?.();await options.scopes?.close?.(); await options.journal.drain();}};
+}
+async function automaticView(options:ReviewOperationsOptions,board:string,item:string):Promise<KanbanItemOperations> {
+    const context=await load(options,board,item,true),projection=await view(options,context);
+    if(!recommendedResolutions(context))return projection;
+    return {...projection,operations:projection.operations.map(entry=>entry.id==='merge'?{...entry,fields:undefined}:entry)};
+}
+
+function recommendedResolutions(context:Context):Record<string,string>|undefined {
+    if(!context.scoped)return;
+    const plan=latest(context,'analyze')?.result as MergePlan|undefined;
+    if(!plan?.conflicts.length||!plan.conflicts.every(conflict=>conflict.resolution))return;
+    return Object.fromEntries(plan.conflicts.map(conflict=>[conflict.id,conflict.resolution!.choice]));
 }
 async function load(options: ReviewOperationsOptions, board: string, item: string, observe: boolean): Promise<Context> {
     const [definition, entry, saved, cleanup] = await Promise.all([options.service.read(board), options.service.item(board, item), options.journal.get<ReviewSettings>(reviewKey(board, item,options.scopeId)),options.journal.get<ReviewCleanup>(reviewCleanupKey(board,item,options.scopeId))]);
@@ -214,7 +226,7 @@ async function run(options: ReviewOperationsOptions, board: string, request: Kan
     requireValue(entry.enabled, 'OPERATION_PREREQUISITE_REQUIRED');
     await requireOperationAuthority({...options,...developmentAuthority},context,request,origin);
     requireValue(request.followUp===undefined||request.action==='build'&&request.followUp==='deploy'&&(!context.deliveryPlan||!context.deliveryPlan.manualAfter&&context.deliveryPlan.steps.includes('deploy')),'OPERATION_REQUEST_INVALID');
-    const input = await operationInput(options, context, request), job = prior ?? (request.action === 'accept' ? await acceptanceJob(options, context, request)
+    const input = await operationInput(options, context, request, origin), job = prior ?? (request.action === 'accept' ? await acceptanceJob(options, context, request)
         : await prepareReviewJob(options, context.board, context.item, context.settings, request, input,request.action==='analyze'?latest(context,'accept')?.snapshot.sourceVersion:undefined));
     await options.journal.update<Array<{board: string; item: string;scopeId?:string}>>('review-operation-scopes', old => old?.some(row => row.board === board && row.item === request.itemId&&row.scopeId===options.scopeId) ? old : [...old ?? [], {board, item: request.itemId,...(options.scopeId?{scopeId:options.scopeId}:{})}]);
     await options.journal.update<ReviewJob>(jobKey(job.id), old => {requireValue(!old || old.fingerprint === job.fingerprint, 'IDEMPOTENCY_CONFLICT'); return old ?? job;});
@@ -224,13 +236,14 @@ async function run(options: ReviewOperationsOptions, board: string, request: Kan
     });
     await options.report?.(job); if(job.phase!=='settled'&&(!automatic||!(await options.service.read(board)).executionControl?.paused))await advanceReviewJob(options,job);if(request.action==='build')await followUp(options,board,request.itemId);await settleDeliveryAcceptance(options,board,request.itemId);return view(options,await load(options,board,request.itemId,false));
 }
-async function operationInput(options: ReviewOperationsOptions, context: Context, request: KanbanItemOperationRequest): Promise<unknown> {
+async function operationInput(options: ReviewOperationsOptions, context: Context, request: KanbanItemOperationRequest,origin:OperationOrigin): Promise<unknown> {
     if (request.action === 'deploy') {
         const built = latest(context, 'build')!, snapshot = await options.adapter.snapshot(context.board, context.item);
         requireValue(snapshot.version === built.snapshot.version, 'OPERATION_SOURCE_CHANGED_REBUILD'); return built.result;
     }
     if (request.action !== 'merge') return;
-    const analysis = latest(context, 'analyze')!, plan = analysis.result as MergePlan, selections = request.selections ?? {};
+    const analysis = latest(context, 'analyze')!, plan = analysis.result as MergePlan;
+    const selections = (origin==='automatic'?recommendedResolutions(context):undefined)??request.selections??{};
     requireValue(Object.keys(selections).length === plan.conflicts.length && plan.conflicts.every(conflict => Object.hasOwn(selections, conflict.id) && conflict.options.some(option => option.id === selections[conflict.id])), 'OPERATION_SELECTION_REQUIRED');
     const current = await options.adapter.snapshot(context.board, context.item);
     if(current.version!==analysis.snapshot.version){

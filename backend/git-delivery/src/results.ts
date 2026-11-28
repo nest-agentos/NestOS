@@ -29,5 +29,7 @@ export function validateMergePlan(value: unknown, job: GitOperationReceiptScope)
             requireValue(/^[\w.-]{1,128}$/.test(option.id) && !options.has(option.id) && typeof option.label === 'string' && option.label.length <= 256
                 && (option.detail === undefined || typeof option.detail === 'string' && option.detail.length <= 4000), 'MERGE_PLAN_OPTION_INVALID'); options.add(option.id);
         }
+        if(conflict.resolution!==undefined)requireValue(conflict.resolution&&options.has(conflict.resolution.choice)
+            &&typeof conflict.resolution.evidence==='string'&&conflict.resolution.evidence.trim().length>0&&conflict.resolution.evidence.length<=4000,'MERGE_PLAN_CONFLICT_INVALID');
     }
 }

@@ -13,7 +13,7 @@ vi.mock('@nestos/git-delivery/identity',()=>({readGitCommitIdentity:vi.fn(async(
 vi.mock('../src/presets/kanban-work-resource-execution', () => ({workResourceExecution: async () => mock.busy ? ['OPERATION_ORIGINAL_SESSION_BUSY'] : []}));
 vi.mock('@nestos/git-delivery/inspection', () => ({inspectWorktree: async () => ({exists: true, head: 'source-head', targetHead: 'target-head', targetBranch: 'main'})}));
 vi.mock('@nestos/git-delivery/repositories', () => ({gitWorkspace: async (_process,_directory,args) => {if(mock.rejectGit)throw Object.assign(new Error('Git should only run at execution boundaries'),{code:'TEST_GIT_DURING_OBSERVATION'});return {stdout: mock.dirty ? ' M file' : '',code:args[0]==='merge-base'&&args[2]==='source-head'?mock.ancestry:0};}, verifyWorktreeDelivery: async () => [{path: '.', fingerprint: 'delivery'}]}));
-vi.mock('../src/projects/harness-context-catalog', () => ({readContextCatalog: async () => ({value: {bindings: {original: {id: 'binding', branchId: 'main', connectionId: 'work-original', validity: mock.context ? 'valid' : 'invalid', nativeRef: {profileId: 'codex', sessionId: 'original-native'}, revision: 7, generation: 2}}}})}));
+vi.mock('../src/projects/harness-context-catalog', () => ({readContextCatalog: async (_kernel,sessionId) => {const id=sessionId==='manager-session'?'planning':'original';return {value:{bindings:{original:{id:'binding',branchId:'main',connectionId:'work-'+id,validity:mock.context?'valid':'invalid',nativeRef:{profileId:'codex',sessionId:id+'-native'},revision:7,generation:2}}}};}}));
 const closes: Array<() => Promise<void>> = [];
 afterEach(async () => {for (const close of closes.splice(0).reverse()) await close(); mock.dirty = mock.busy = mock.rejectGit = false; mock.context = true;mock.ancestry=0;});
 async function fixture(withExchange = false,serviceControl?:import('@nestos/app-contracts/services').RuntimeServiceControl) {
@@ -212,20 +212,32 @@ it('keeps maintenance entry messages bounded while retaining full task and versi
  }
 });
 
-it('runs management scope phases in the retained contributor Session and keeps aggregate channel context across a resume',async()=>{
+async function retainManager(f:Awaited<ReturnType<typeof fixture>>) {
+ const dir='/workspace/_nestos/worktrees/planning';
+ await f.journal.update('analysis-current:["board","manager"]',()=> 'analysis:management-test');
+ await f.journal.update('analysis:management-test',()=>({id:'planning',input:{request:{expectedSessionId:'planning'}}}));
+ await f.journal.update('worktree:planning',()=>({id:'planning',directory:dir,branch:'work/planning',phase:'ready'}));
+ await f.journal.update('development-workspace:planning',()=>({directory:dir,projectId:'project',context:{board:{id:'board'},task:{id:'manager'}},policy:{profile:'development',commit:'changes',modules:[]}}));
+ const original=await f.calls.list();
+ f.calls.list.mockImplementation(async ({sessionId}: {sessionId:string}={sessionId:'original'})=>sessionId==='planning'?
+    [{...original[0],receipt:{executionSessionId:'manager-session'},input:{request:{...original[0].input.request,submission:{id:'planning'}}}}]:original);
+}
+
+it('runs management scope phases in the retained coordination Session and keeps aggregate channel context across a resume',async()=>{
  const f=await fixture(true),owner={id:'manager',title:'Manage',status:'inProgress',planning:{execution:'children'}};
  Object.assign(f.item,{status:'completed',planning:{parentId:'manager'}});Object.assign(f.board,{items:[owner,f.item]});
  (f.workflow.dispatches as any).d={id:'d',itemId:'task',attempt:1,outcome:'accepted',executionSessionId:'original-session'};
  const scope={schema:1,id:'repository-one',boardId:'board',ownerId:'manager',projectId:'project',label:'Project',contributors:[{itemId:'task',title:'Task',dispatchId:'d',worktreeId:'original'}]};
  const api=managementReviewAdapter(f.options as never,scope as never);closes.push(()=>api.close!());
+ await retainManager(f);
  const snapshot=await api.snapshot(f.board,owner as never),request=await api.prepareOperation!({id:'batch-analysis',action:'analyze',board:f.board,item:owner as never,snapshot});
- expect(request.expectedSessionId).toBe('original-session');expect((request.source as any).text).toContain('management-integration-pre.md');
- const manifest=JSON.parse(await readPrompt(f.fs,'/workspace/_nestos/worktrees/original/_nestos/kanban/review/batch-analysis/manifest.json'));
+ expect(request.expectedSessionId).toBe('manager-session');expect((request.source as any).text).toContain('management-integration-pre.md');
+ const manifest=JSON.parse(await readPrompt(f.fs,'/workspace/_nestos/worktrees/planning/_nestos/kanban/review/batch-analysis/manifest.json'));
  expect(manifest.context.resources.management).toMatchObject({ownerId:'manager',sources:[{itemId:'task'}]});
  f.channels.request('batch-analysis','request','unsupported.context',{});
- expect(await api.exchange!({id:'batch-analysis',boardId:'board',itemId:'manager',scopeId:scope.id,request,snapshot} as never,{sessionId:'original-session',outcome:'succeeded'})).toMatchObject({outcome:'running'});
- expect(f.submission.start).toHaveBeenCalledWith(expect.objectContaining({expectedSessionId:'original-session'}));
- expect(await api.relatedSession!(f.board,owner as never)).toBe('original-session');
+ expect(await api.exchange!({id:'batch-analysis',boardId:'board',itemId:'manager',scopeId:scope.id,request,snapshot} as never,{sessionId:'manager-session',outcome:'succeeded'})).toMatchObject({outcome:'running'});
+ expect(f.submission.start).toHaveBeenCalledWith(expect.objectContaining({expectedSessionId:'manager-session'}));
+ expect(await api.relatedSession!(f.board,owner as never)).toBe('manager-session');
 });
 
 it('observes active management and continuation turns without acquiring Git execution, then rechecks before resuming',async()=>{
@@ -234,17 +246,18 @@ it('observes active management and continuation turns without acquiring Git exec
  (f.workflow.dispatches as any).d={id:'d',itemId:'task',attempt:1,outcome:'accepted',executionSessionId:'original-session'};
  const scope={schema:1,id:'repository-one',boardId:'board',ownerId:'manager',projectId:'project',label:'Project',contributors:[{itemId:'task',title:'Task',dispatchId:'d',worktreeId:'original'}]};
  const api=managementReviewAdapter(f.options as never,scope as never);closes.push(()=>api.close!());
+ await retainManager(f);
  const snapshot=await api.snapshot(f.board,owner as never),request=await api.prepareOperation!({id:'batch-observe',action:'analyze',board:f.board,item:owner as never,snapshot});
  const job={id:'batch-observe',boardId:'board',itemId:'manager',scopeId:scope.id,request,snapshot} as never;
  mock.rejectGit=true;
- expect(await api.exchange!(job,{sessionId:'original-session',outcome:'running'})).toMatchObject({outcome:'running'});
+ expect(await api.exchange!(job,{sessionId:'manager-session',outcome:'running'})).toMatchObject({outcome:'running'});
  f.channels.request('batch-observe','request','unsupported.context',{});
- await expect(api.exchange!(job,{sessionId:'original-session',outcome:'succeeded'})).rejects.toMatchObject({code:'TEST_GIT_DURING_OBSERVATION'});
+ await expect(api.exchange!(job,{sessionId:'manager-session',outcome:'succeeded'})).rejects.toMatchObject({code:'TEST_GIT_DURING_OBSERVATION'});
  expect(f.submission.start).not.toHaveBeenCalled();
  mock.rejectGit=false;
- expect(await api.exchange!(job,{sessionId:'original-session',outcome:'succeeded'})).toMatchObject({outcome:'running'});
+ expect(await api.exchange!(job,{sessionId:'manager-session',outcome:'succeeded'})).toMatchObject({outcome:'running'});
  mock.rejectGit=true;
- expect(await api.exchange!(job,{sessionId:'original-session',outcome:'succeeded'})).toMatchObject({outcome:'running'});
+ expect(await api.exchange!(job,{sessionId:'manager-session',outcome:'succeeded'})).toMatchObject({outcome:'running'});
  expect(f.submission.start).toHaveBeenCalledOnce();
 });
 

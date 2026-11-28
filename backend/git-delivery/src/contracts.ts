@@ -6,7 +6,7 @@ export interface GitSource {taskId?:string;sourceHead?:string;sourceTree?:string
 export interface GitIntegration {operationId?:string;incompleteCode?:'OPERATION_RESULT_BATCH_INCOMPLETE'|'OPERATION_RESULT_MERGE_UNCONFIRMED';previousTarget:string;actualTarget:string;reportedTarget?:string;sources:GitSource[];approval?:GitApproval}
 export interface MergePlan {
     sourceVersion:string;targetVersion:string;summary:string;
-    conflicts:Array<{id:string;path:string;reason:string;options:Array<{id:string;label:string;detail?:string}>}>;
+    conflicts:Array<{id:string;path:string;reason:string;options:Array<{id:string;label:string;detail?:string}>;resolution?:{choice:string;evidence:string}}>;
 }
 export interface GitOperationReceiptScope {
     id:string;action:'build'|'deploy'|'accept'|'analyze'|'merge';requireStatus:boolean;expectedVersion?:string;

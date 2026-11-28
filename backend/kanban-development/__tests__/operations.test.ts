@@ -778,6 +778,20 @@ it('starts a ready management scope without a prior manual action and refreshes 
  expect(await f.journal.get('automatic-delivery:'+JSON.stringify(['board','task','repository-auto']))).toMatchObject({step:4});
 });
 
+it.each([true,false])('automatically applies only conflict choices supported by the coordination analysis (%s)',async (resolved)=>{
+ const f=await automaticAnalysisFixture(),read=f.options.adapter.readOperation!;
+ Object.assign(f.item,{status:'open',planning:{execution:'children'}});
+ const id='repository-conflict',conflict={id:'content',path:'file',reason:'Both sides edited the file',options:[{id:'integrate',label:'Combine'}]};
+ const adapter={...f.options.adapter,ready:()=>true,readOperation:async (job:ReviewJob)=>job.action==='analyze'?
+     {...job.snapshot,summary:'Integration analysis',conflicts:[{...conflict,...(resolved?{resolution:{choice:'integrate',evidence:'Both confirmed behaviors must remain'}}:{})}]}:read(job)};
+ f.options.scopes={describe:async()=>({scopes:[{id,label:'Repository',contributors:[],ready:true}]}),resolve:async()=>({adapter})};
+ await scans(f.api);
+ const state=await f.journal.get<{requests:{merge?:{operationId:string}};code?:string}>('automatic-delivery:'+JSON.stringify(['board','task',id]));
+ if(!resolved){expect(submittedActions(f)).toEqual(['analyze']);expect(state?.code).toBe('OPERATION_SELECTION_REQUIRED');return;}
+ expect(submittedActions(f)).toEqual(['analyze','merge']);
+ expect(await f.journal.get<ReviewJob>(jobKey(state!.requests.merge!.operationId))).toMatchObject({operationContext:{selections:{content:'integrate'}}});
+});
+
 it('only retires a proven independent legacy finalizer for the same software target',async()=>{
  const {releasableDevelopmentTarget}=await import('../src/development-operation-policy');
  const item={id:'old',status:'completed',planning:{execution:'children'},externalRefs:[{system:'nestos-remote-project',id:'project'}]};

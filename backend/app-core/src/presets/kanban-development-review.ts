@@ -54,7 +54,7 @@ export interface DevelopmentReviewOptions {
 }
 type Options=DevelopmentReviewOptions;
 interface MaintenanceInput {extraPrompts?:import('../run/prompt-bundle').PromptFile[];deployment?:import('@nestos/app-contracts/services').RuntimeServiceDescriptor;id: string; board: KanbanBoard; item: KanbanItem; snapshot: ReviewSnapshot; action?: Exclude<import('@nestos/kanban-development').ReviewAction, 'accept'>; context?: unknown}
-interface ReviewResource {id: string; tree: PreparedWorktree; record: DevelopmentWorkspaceRecord}
+interface ReviewResource {id: string; tree: PreparedWorktree; record: DevelopmentWorkspaceRecord; planningCall?:true}
 export function developmentReviewAdapter(options: Options): ReviewAdapter {
     const watches = new DirectorySubscriptions();
     const watch = async (job: ReviewJob, terminal=false) => {
@@ -112,9 +112,14 @@ async function snapshot(options: Options, board: KanbanBoard, item: KanbanItem):
     });
 }
 async function prepareAnalysis(options: Options, input: MaintenanceInput): Promise<SubmissionRequest> {
-    const current = await resource(options, input.item, input.board.id), calls = await options.calls.list({sessionId: current.id});
-    const reasons = await workResourceExecution(options,current.id,current.record.projectId,{purpose:'resume',operationId:input.id}); requireValue(!reasons.length, reasons[0] ?? 'OPERATION_ORIGINAL_SESSION_BUSY');
-    const original = calls.find(row => row.receipt.executionSessionId && row.input.request.expectedTarget);
+    return prepareReviewInResource(options,input,await resource(options,input.item,input.board.id));
+}
+export async function prepareReviewInResource(options:Options,input:MaintenanceInput,current:ReviewResource):Promise<SubmissionRequest> {
+    const calls = await options.calls.list({sessionId: current.id});
+    const reasons = await workResourceExecution(options,current.id,current.record.projectId,{purpose:'resume',operationId:input.id});
+    requireValue(!reasons.length, reasons[0]==='WORKTREE_IN_USE'?'OPERATION_ORIGINAL_SESSION_BUSY':reasons[0]);
+    const original = calls.find(row => row.receipt.executionSessionId && row.input.request.expectedTarget
+        && (!current.planningCall||row.input.request.submission?.id===current.id));
     requireValue(original?.receipt.executionSessionId && calls.every(row => row.callerState?.settled && row.executionTree?.settled), 'OPERATION_ORIGINAL_SESSION_UNAVAILABLE');
     const sessionId = original.receipt.executionSessionId, activity = await options.kernel.sessionActivity(sessionId);
     requireValue(!Object.entries(activity.counts).some(([key, count]) => ['running', 'queued', 'created', 'waiting', 'blocked', 'paused'].includes(key) && count > 0), 'OPERATION_ORIGINAL_SESSION_BUSY');
@@ -182,7 +187,8 @@ async function readOperation(options: Options, job: ReviewJob): Promise<unknown 
     const board = await options.service.read(job.boardId), item = (await options.service.item(job.boardId, job.itemId)).item;
     const current = await resource(options, item, board.id), folder = await options.projects.get(current.record.projectId), view = await options.projects.openWorkspace(folder.path);
     let result: unknown;
-    try {result=await operationReceipt(view.fs,current.record.directory+'/_nestos/kanban/review/'+job.id,await readReviewResult(options,current.record.projectId,job),options.journal,job.id);
+    try {const review=await options.journal.get<DevelopmentWorkspaceRecord>('development-workspace:'+job.id);
+        result=await operationReceipt(view.fs,review?.communicationDirectory??current.record.directory+'/_nestos/kanban/review/'+job.id,await readReviewResult(options,current.record.projectId,job),options.journal,job.id);
         if (job.action === 'build' && result && (result as {status?: string}).status === 'succeeded') {
             const frozen=await options.journal.get<DevelopmentWorkspaceRecord>('development-workspace:'+job.id);
             const deployment=(frozen?.context as {operation?:{deployment?:import('@nestos/app-contracts/services').RuntimeServiceDescriptor}})?.operation?.deployment;
