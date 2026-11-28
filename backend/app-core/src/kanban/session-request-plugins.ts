@@ -1,3 +1,4 @@
+import {decisionCreationMethods} from './decision-creation-methods';
 import {previewExecutionCheckWaiver,confirmExecutionCheckWaiver} from './execution-check-waiver';
 import {beginManagementCleanup,readManagementCleanup,completeManagementCleanup} from './cleanup-review-conversations';
 import {createModuleLogger} from '@nestos/common';
@@ -28,9 +29,9 @@ export async function resolveKanbanPluginRequest(options:DecisionConversationOpt
             return options.service.record(typeof input.params.boardId==='string'?input.params.boardId:conversation.boardId,input.params.recordId);
         }),
         ...conversation.binding.purpose==='coordination'?[]:[
-            method('status','Read this draft, confirmation and available actions.',schema({}),decision('read')),
-            method('propose','Preview one decision. dependsOn blocks all planning until upstream delivery completes.',schema({id:string,title:string,content:string,rationale:string,projectIds:{type:'array',items:string},verificationMode:{enum:['build-cleanup','release','quick','full','build','source'],description:'Defaults to merge, build and cleanup. Choose release, quick or full only when deployment is requested.'},dependsOn:{type:'array',maxItems:16,items:schema({boardId:string,recordId:string},['boardId','recordId'])}},['id','title','content','rationale','projectIds']),decision('propose'),'command'),
-            method('confirm','Create only after the real user says the exact returned confirmation. Read the execution receipt.',schema({proposalDigest:string},['proposalDigest']),decision('confirm'),'command'),
+            method('status',decisionCreationMethods.status.description,decisionCreationMethods.status.inputSchema,decision('read')),
+            method('propose',decisionCreationMethods.propose.description,decisionCreationMethods.propose.inputSchema,decision('propose'),'command'),
+            method('confirm',decisionCreationMethods.confirm.description,decisionCreationMethods.confirm.inputSchema,decision('confirm'),'command'),
         ],
     ]}];
     if(management)plugins.push({id:'delivery',version:'1',description:'Bound management task delivery operations, analysis, integration and receipt reconciliation.',methods:[

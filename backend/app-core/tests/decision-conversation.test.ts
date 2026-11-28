@@ -1,3 +1,4 @@
+import {memoryChannels} from './helpers/session-channels';
 import {afterEach,expect,it,vi} from 'vitest';
 import {createVFS,MemoryBackend} from '@nestos/vfs-core';
 import {createKanbanModule,SeqKanbanStore} from '@nestos/kanban';
@@ -340,4 +341,59 @@ it('writes one task change remark and its confirmation source with the confirmed
  expect(notes[0].data).toMatchObject({message:updated.changeSummary,recordId:'edit-scope',requirementChange:{revision:held.record.revision+1,
     source:{sessionId:'/native/original',messageId:'confirmed-change'}}});
  expect((await f.service.item('b','work')).item.acceptance).toBe('Check both paths');
+});
+
+it('previews and confirms directly and requires another preview after an intervening user clarification',async()=>{
+ const f=await fixture(),{resolveKanbanPluginRequest}=await import('../src/kanban/session-request-plugins');
+ Object.assign(f.conversation.binding,{decisionProtocol:1,inputId:'bootstrap'});
+ const call=(id:string,method:string,input:Record<string,unknown>)=>resolveKanbanPluginRequest(f.options,f.conversation,
+   {id,scopeId:'conversation',method:'kanban.invoke',params:{pluginId:'decisions',method,input}});
+ const input={id:'fast',title:'Fast',content:'All decisions',rationale:'User scope',projectIds:['one']};
+ const msg=(id:string,text:string,turnId?:string)=>({id,text,role:'user',turnId});
+ const injected={...msg('context','Injected rules'),contentPartKinds:['agents_md.instructions'],contentParts:['Injected rules']};
+ const requests=[msg('bootstrap-msg','Read the context','startup'),msg('scope','Sort all decisions')];
+ const submissions=[{id:'bootstrap',turnId:'startup'},{id:'reply-preview',turnId:'preview-turn'}];
+ const show=(...messages:ReturnType<typeof msg>[])=>f.read.mockResolvedValue({messages,instructionQueue:{submissions}} as any);
+ show(requests[0]);
+ await expect(call('no-requirement','propose',input)).rejects.toMatchObject({code:'DECISION_REQUIREMENT_REQUIRED'});
+ show(...requests);
+ const first=await call('preview','propose',input) as any;
+ expect(first).toMatchObject({state:'draft',confirmation:'确认决策'});expect(f.runRecord).not.toHaveBeenCalled();
+ const reply=msg('reply-msg','Read the proposal reply','preview-turn'),clarification=msg('clarification','Only the panel list');
+ await f.options.journal.update('decision-response:conversation:preview:resumed',()=>true);
+ show(...requests,clarification,reply,msg('old-confirm','确认决策'));
+ await expect(call('old-confirm','confirm',{proposalDigest:first.proposalDigest})).rejects.toMatchObject({code:'DECISION_PROPOSAL_CHANGED'});
+ expect((await f.service.records('b')).total).toBe(0);
+ show(...requests,reply,clarification);
+ const second=await call('new-preview','propose',{...input,content:'Only the panel list'}) as any;
+ show(...requests,reply,clarification,injected,msg('new-confirm','确认决策'));
+ await expect(call('new-confirm','confirm',{proposalDigest:second.proposalDigest})).resolves.toMatchObject({state:'confirmed'});
+ expect(await f.service.record('b','fast')).toMatchObject({content:'Only the panel list'});
+ expect(f.runRecord).toHaveBeenCalledOnce();
+});
+
+it('settles normal creation through two durable host replies without any schema or draft lookup',async()=>{
+ const f=await fixture(),channels=memoryChannels(),enqueue=vi.fn(async()=>{});
+ const {decisionConversations}=await import('../src/kanban/decision-conversations');
+ const scope='conversation',key='record-conversation:'+scope;
+ await f.options.journal.update(key,()=>({...f.conversation,state:'clarifying',phase:'submitting',
+   binding:{...f.conversation.binding,decisionProtocol:1,inputId:'bootstrap'}}));
+ f.options.remote={...f.options.remote,sessionChannel:channels.channel,projectHarness:async()=>({subscribeChannel:()=>()=>{},close:async()=>{}}),
+   projectConversation:async()=>({read:f.read,enqueue,close:async()=>{}})};
+ const loop=decisionConversations(f.options);closes.push(loop.quiesce);
+ const advance=()=>loop.startRecordConversation('b',{operationId:scope});
+ const request=(id:string,method:string,input:Record<string,unknown>)=>channels.request(scope,id,'kanban.invoke',{pluginId:'decisions',method,input});
+ const initial={id:'scope',role:'user',text:'Sort the panel'};
+ f.read.mockResolvedValue({messages:[initial]});
+ request('preview','propose',{id:'panel',title:'Panel',content:'Sort panel rows',rationale:'User scope',projectIds:['one']});
+ await advance();await advance();
+ const preview=channels.ensure(scope).requests[0].response as {payload:{proposalDigest:string}};
+ expect(preview).toMatchObject({status:'ok',payload:{state:'draft'}});
+ expect((await f.service.records('b')).total).toBe(0);
+ f.read.mockResolvedValue({messages:[initial,{id:'confirm',role:'user',text:'确认决策'}]});
+ request('confirm','confirm',{proposalDigest:preview.payload.proposalDigest});
+ await advance();await advance();
+ expect(channels.ensure(scope).requests[1].response).toMatchObject({status:'ok',payload:{state:'confirmed'}});
+ expect(enqueue.mock.calls.map(call=>(call as unknown[])[3])).toEqual(['reply-preview','reply-confirm']);
+ expect(f.runRecord).toHaveBeenCalledOnce();
 });

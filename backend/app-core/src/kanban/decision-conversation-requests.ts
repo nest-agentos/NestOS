@@ -4,7 +4,7 @@ import {decisionModuleReference} from './decision-modules';
 import {validateDecisionDependencies} from '@nestos/kanban/integration';
 import {confirmRecordExecution,itemsWithinRoots,itemWithinRoots} from '@nestos/kanban/integration';
 import {conversationIssuesKey,conversationIssueView,type ConversationIssueState} from '../run/conversation-issues';
-import {requireUserConfirmation} from './decision-conversation-confirmation';
+import {readDecisionUserMessages,requireUserConfirmation} from './decision-conversation-confirmation';
 import {cancelDecisionConversation,conversationCancellationState} from './decision-conversation-cancellation';
 import {conversationPolicy} from './conversation-policy';
 import {kanbanVerificationOptions,type KanbanRecordInput,type KanbanCommand} from '@nestos/kanban/contracts';
@@ -16,7 +16,7 @@ import {requireValue} from './validation';
 import {decisionProjectScope} from './decision-project-scope';
 import {kanbanReferences} from './work-log-policy';
 interface Link {recordId:string;state:'draft'|'confirmed';proposalDigest:string}
-interface Proposal {record:KanbanRecordInput;proposalDigest:string;lastActivityAt?:number}
+interface Proposal {record:KanbanRecordInput;proposalDigest:string;lastActivityAt?:number;basisMessageId?:string}
 const proposalKey=(id:string)=>'decision-conversation-proposal:'+id;
 const linkKey=(id:string)=>'decision-conversation-record:'+id;
 
@@ -27,11 +27,12 @@ export async function resolveDecisionRequest(options:DecisionConversationOptions
     if(request.method==='decision.read') {
         const record=link?await options.service.record(board.id,link.recordId):null,proposal=await options.journal.get<Proposal>(proposalKey(conversation.id));
         const selected=request.params.itemIds;
+        const publicProposal=proposal&&{record:proposal.record,proposalDigest:proposal.proposalDigest,lastActivityAt:proposal.lastActivityAt};
         requireValue(selected===undefined||Array.isArray(selected)&&selected.length<=1&&selected.every(id=>typeof id==='string'),'INVALID_DETAIL_SELECTION');
         const page=record?.hadRecurrence?await options.client().recordExecutionPage?.(board.id,record.id,{limit:20}):undefined;
         const roots=record?[...record.itemIds,...page?.active.flatMap(run=>run.boardId===board.id&&run.rootItemId?[run.rootItemId]:[])??[],...page?.items.flatMap(run=>run.boardId===board.id&&run.rootItemId?[run.rootItemId]:[])??[]]:[];
         const tasks=record?itemsWithinRoots(board.items,roots,{includeDeleted:true}):[];
-        return {capabilities:{discover:'kanban.discover',describe:'kanban.describe',invoke:'kanban.invoke'},conversationId:conversation.id,...await decisionConversationState(options,conversation.id,board.id),actions:{cancel:{method:'decision.cancel',params:{},confirmation:(await conversationPolicy(options.fs)).cancelDecision}},projectIds:conversation.binding.projectIds,conversationProjectId:conversation.binding.projectId,board:{id:board.id,title:board.title},record,...(!link&&proposal?{proposal}:{}),total:tasks.length,
+        return {capabilities:{discover:'kanban.discover',describe:'kanban.describe',invoke:'kanban.invoke'},conversationId:conversation.id,...await decisionConversationState(options,conversation.id,board.id),actions:{cancel:{method:'decision.cancel',params:{},confirmation:(await conversationPolicy(options.fs)).cancelDecision}},projectIds:conversation.binding.projectIds,conversationProjectId:conversation.binding.projectId,board:{id:board.id,title:board.title},record,...(!link&&publicProposal?{proposal:publicProposal}:{}),total:tasks.length,
             tasks:(Array.isArray(selected)?tasks.filter(item=>selected.includes(item.id)):tasks.slice(0,50)).map(item=>({id:item.id,title:item.title.slice(0,160),status:item.status,revision:item.revision,projectIds:item.externalRefs?.filter(ref=>ref.system===REMOTE_PROJECT_REFERENCE).map(ref=>ref.id)??[],admittedAt:item.launch?.admittedAt,editing:item.launch?.editing,
                 ...(Array.isArray(selected)&&selected.includes(item.id)?{responsibility:item.responsibility,acceptance:item.acceptance,planning:item.planning}:{})}))};
     }
@@ -58,6 +59,8 @@ async function propose(options:DecisionConversationOptions,conversation:Decision
     const value=request.params as {id:string;title:string;content:string;rationale:string;projectIds:string[];verificationMode?:string;dependsOn?:import('@nestos/kanban/contracts').KanbanDecisionDependency[]};
     requireValue(typeof value.id==='string'&&/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/.test(value.id)&&Array.isArray(value.projectIds)&&value.projectIds.length>0&&value.projectIds.length<=16,'DECISION_PROPOSAL_INVALID');
     requireValue(new Set(value.projectIds).size===value.projectIds.length,'DECISION_PROPOSAL_INVALID');
+    const basisMessageId=conversation.binding.decisionProtocol?(await readDecisionUserMessages(options,conversation)).at(-1)?.id:undefined;
+    requireValue(!conversation.binding.decisionProtocol||basisMessageId,'DECISION_REQUIREMENT_REQUIRED');
     const dependsOn=await validateDecisionDependencies(options.service,conversation.boardId,value.id,value.dependsOn);
     const scope=conversation.binding.projectIds;
     requireValue(!scope||scope.length===value.projectIds.length&&value.projectIds.every(id=>scope.includes(id)),'DECISION_PROJECT_SCOPE_MISMATCH');
@@ -75,13 +78,13 @@ async function propose(options:DecisionConversationOptions,conversation:Decision
     const previous=await options.journal.get<Link>(linkKey(conversation.id));requireValue(!previous,'DECISION_ALREADY_CONFIRMED');
     requireValue([value.title,value.content,value.rationale].every(text=>typeof text==='string'&&text.trim().length>0),'DECISION_PROPOSAL_INVALID');
     const proposal={record,proposalDigest:channelDigest(record)};
-    await options.journal.update<Proposal>(proposalKey(conversation.id),old=>{requireValue(!old||old.record.id===value.id,'DECISION_ID_IMMUTABLE');return {...proposal,lastActivityAt:old?.proposalDigest===proposal.proposalDigest?old.lastActivityAt:Date.now()};});
+    await options.journal.update<Proposal>(proposalKey(conversation.id),old=>{requireValue(!old||old.record.id===value.id,'DECISION_ID_IMMUTABLE');return old?.proposalDigest===proposal.proposalDigest?old:{...proposal,...(basisMessageId?{basisMessageId}:{}),lastActivityAt:Date.now()};});
     return {state:'draft',...proposal,...(modules.length?{modules}:{}),confirmation:(await conversationPolicy(options.fs)).confirmDecision};
 }
 async function confirm(options:DecisionConversationOptions,conversation:DecisionConversation,request:ChannelRequest,previous?:Link) {
     const proposal=await options.journal.get<Proposal>(proposalKey(conversation.id)),digest=previous?.proposalDigest??proposal?.proposalDigest;
     requireValue(digest,'DECISION_PROPOSAL_REQUIRED');requireValue(request.params.proposalDigest===digest,'DECISION_PROPOSAL_CHANGED');
-    await requireUserConfirmation(options,conversation,request,(await conversationPolicy(options.fs)).confirmDecision);
+    await requireUserConfirmation(options,conversation,request,(await conversationPolicy(options.fs)).confirmDecision,undefined,previous?undefined:proposal?.basisMessageId);
     let link=previous;
     if(!link){
         requireValue(proposal,'DECISION_PROPOSAL_REQUIRED');

@@ -22,9 +22,14 @@ export function decisionConversations(options:DecisionConversationOptions) {
             if(JSON.stringify(issues.pendingReports)!==JSON.stringify(conversation.pendingReports??[]))options.log({operationId:conversation.id,boardId:conversation.boardId,stage:issues.pendingReports.length?'decision.reports.blocked':'decision.reports.resolved',result:issues.code==='DECISION_SESSION_ERROR_REPORTED'?'failure':'success',code:issues.code,durationMs:Date.now()-started});}
 
         const pending=channelRequests(await options.remote.sessionChannel(conversation.binding.projectId,'requests',{scopeId:conversation.id}),conversation.id);
+        const keyPrefix='decision-response:'+conversation.id+':';
+        const answered=pending.filter(row=>row.response).map(row=>row.request.id);
+        const resumes=answered.length?await options.journal.getMany<boolean>(answered.map(id=>keyPrefix+id+':resumed')):[];
+        const settled=new Set(answered.filter((_,index)=>resumes[index]));
         for(const row of pending) {
             if(!active())break;
-            const started=Date.now(),key='decision-response:'+conversation.id+':'+row.request.id;
+            if(settled.has(row.request.id))continue;
+            const started=Date.now(),key=keyPrefix+row.request.id;
             let response=await options.journal.get<ChannelResponse>(key);
             if(!response) {
                 try{response={id:row.request.id,scopeId:conversation.id,requestDigest:row.requestDigest,status:'ok',payload:JSON.parse(JSON.stringify(await (row.request.method.startsWith('kanban.')?resolveKanbanPluginRequest:conversation.binding.purpose==='coordination'?resolveCoordinationRequest:resolveDecisionRequest)({...options,active},conversation,row.request))),error:null};}

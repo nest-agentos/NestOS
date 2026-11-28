@@ -35,7 +35,7 @@ it('creates the discussion channel on the explicit primary with only its selecte
   const port=decisionConversationTransport(options,async()=>({})),resources=['one','two'].map(id=>({system:'nestos-remote-project',id}));
   expect(await port.prepare('conversation','board',resources,resources[1])).toMatchObject({projectId:'two',projectIds:['one','two'],workspaceId:'p-two'});
   expect(projectHarness).toHaveBeenCalledWith('two',{requireRegistered:true});
-  expect(sessionChannel).toHaveBeenCalledWith('two','open',expect.objectContaining({cwd:'_nestos/kanban/conversations/conversation',contextProjects:[{projectId:'p-one',revision:1},{projectId:'p-two',revision:2}],snapshot:expect.objectContaining({context:expect.objectContaining({primaryProjectId:'two',secondaryProjectIds:['one']})})}));
+  expect(sessionChannel).toHaveBeenCalledWith('two','open',expect.objectContaining({cwd:'_nestos/kanban/conversations/conversation',contextProjects:[{projectId:'p-one',revision:1},{projectId:'p-two',revision:2}],snapshot:expect.objectContaining({context:expect.objectContaining({primaryProjectId:'two',secondaryProjectIds:['one'],decisionCommands:expect.objectContaining({requestMethod:'kanban.invoke',pluginId:'decisions',defaultVerificationMode:'build-cleanup',methods:expect.objectContaining({propose:expect.objectContaining({inputSchema:expect.objectContaining({required:['id','title','content','rationale','projectIds']})})})})})})}));
   expect(close).toHaveBeenCalledOnce();expect(dispose).toHaveBeenCalledOnce();
   projectHarness.mockRejectedValueOnce(Object.assign(Error('Authorization changed'),{code:'ECONFLICT'}));
   await expect(port.prepare('conflict','board',resources,resources[1])).rejects.toMatchObject({code:'DECISION_AUTHORIZATION_CHANGED'});
