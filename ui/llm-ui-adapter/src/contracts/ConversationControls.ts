@@ -46,6 +46,7 @@ export interface ConversationMetrics {
     errors?: {context?: string; quota?: string};
 }
 export interface ConversationSnapshot {
+    executedModel?: {modelId: string; reasoningEffort?: string; providerId?: string};
     historyRecovery?: {skippedRecords: number; skippedBytes: number; nulRecords: number;
         invalidJsonRecords: number; invalidRecordRecords: number; firstOffset: number; lastOffset: number};
     metrics?: ConversationMetrics;

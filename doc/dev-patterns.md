@@ -45,6 +45,10 @@ Provider 的“测试连接”统一使用用户选定的文本模型：目录�
 
 选择 Harness 后可同时配置模型和该模型支持的推理级别。单块看板沿用整个默认组合，或为该角色保存自己的组合。创建决策表单预填已解析的默认配置，提交时可更改，实际启动前按目标项目重新校验模型和推理级别。
 
+原生会话输入区的模型选择用于提交配置，留空时由 Cells 上的原生执行器解析。会话标题和会话信息展示原生执行记录上报的最近模型与推理级别，缺失字段在会话信息中显示「未上报」。该展示沿用现有会话读取，不触发模型目录或额外的历史读取。
+
+AGY 1.5 会话刷新时，Cells 通过已授权的会话摘要与 ID 绑定打开原生 SQLite 正文，按步骤索引分页读取已保存的用户输入和助手回复。读取不启动执行器或恢复工作区写入权。近期运行轨迹仍来自 Cells 捕获的实时事件，与原生历史按步骤边界衔接。
+
 reasoning 声明属于模型，reasoningByProtocol 可针对具体路由协议覆盖或禁用；包含 efforts（稳定 ID、显示名及可选 API 值）、canDisable、defaultEffort、预算范围及 transport。未声明不生成一组猜测的等级；服务端默认与显式关闭分开。设置页与聊天输入按实际模型显示选项，主力/常规/快速是路由档位，不是推理等级。切换模型恢复当前会话中该路由的选择，不改变全局默认。旧的未声明能力请求保留兼容；明确声明的等级、关闭和预算在通信前校验。
 
 内置目录是产品预设，厂商变更只更新 presets；通信模块不按模型名称猜协议。豆包文本目录与语音服务分开配置，Seedream 使用 volcengine-images 原生图片适配器及显式能力。参照 [方舟文本目录](https://docs.volcengine.com/docs/ark/model-list?lang=zh)、[图片 API](https://docs.volcengine.com/docs/ark/image-generation-api?lang=zh)、[语音 HTTP API](https://docs.volcengine.com/docs/DoubaoVoice/unidirectional-streaming-text-to-speech-http?lang=zh) 与 [DeepSeek 模型元数据](https://api-docs.deepseek.com/api/list-models/)，本次核对日期为 2026-10-22；目录声明不是账号权限验证。

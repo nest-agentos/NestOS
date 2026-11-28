@@ -9,6 +9,7 @@ import {nativeWriterLockText} from './native-writer-lock';
 /** Secondary diagnostics stay behind More; updates never replace input or history DOM. */
 export class ConversationInformation {
     private readonly button = document.createElement('button');
+    private inlineModel?: HTMLButtonElement;
     private dialog?: HTMLDialogElement;
     private snapshot?: ConversationSnapshot;
     private status = '';
@@ -18,11 +19,26 @@ export class ConversationInformation {
         this.button.innerHTML = ACTION_ICONS.info; this.button.title = t('project.sessionInfo');
         const label = document.createElement('span'); label.textContent = this.button.title; this.button.append(label);
         this.button.setAttribute('aria-haspopup', 'dialog');
-        this.button.dataset.action = 'conversation-information'; this.button.onclick = () => this.open(); parent.append(this.button);
+        this.button.dataset.action = 'conversation-information'; this.button.onclick = () => this.open(this.button); parent.append(this.button);
     }
-    setSnapshot(snapshot: ConversationSnapshot): void {this.snapshot = snapshot; this.refresh();}
+    mountInlineModel(parent: HTMLElement): void {
+        const button = this.inlineModel = document.createElement('button');
+        button.type = 'button'; button.className = 'remote-conversation-info__model';
+        button.hidden = true; button.setAttribute('aria-haspopup', 'dialog');
+        button.onclick = () => this.open(button); parent.append(button);
+    }
+    setSnapshot(snapshot: ConversationSnapshot): void {
+        this.snapshot = snapshot;
+        const button = this.inlineModel, model = snapshot.executedModel;
+        if (button) {
+            button.hidden = !model;
+            button.textContent = [model?.modelId, model?.reasoningEffort].filter(Boolean).join(' · ');
+            button.title = [t('harness.executedModel'), model?.providerId, button.textContent].filter(Boolean).join(' · ');
+        }
+        this.refresh();
+    }
     setStatus(text: string, tooltip = ''): void {this.status = text; this.tooltip = tooltip; this.refresh();}
-    private open(): void {
+    private open(opener: HTMLElement): void {
         if (this.dialog?.open) return;
         const dialog = this.dialog = document.createElement('dialog'); dialog.className = 'remote-conversation-info';
         dialog.setAttribute('aria-label', t('project.sessionInfo'));
@@ -34,6 +50,7 @@ export class ConversationInformation {
             <p class="remote-conversation-info__help">${escapeHTML(t('harness.activityHint'))}</p>
             <section><h3>${escapeHTML(t('harness.runtimeStatus'))}</h3>
             <p data-session-info-status></p><p class="remote-conversation-info__help" data-session-info-observation></p>
+            <dl class="remote-conversation-info__times" data-session-info-executed-model></dl>
             <p class="remote-conversation-info__help" data-native-writer-lock></p></section>
             <section data-session-info-meter><h3>${escapeHTML(t('harness.usageTitle'))}</h3><p data-session-info-usage></p>
             <p class="remote-conversation-info__help">${escapeHTML(t('harness.usageHelp'))}</p></section>
@@ -46,7 +63,7 @@ export class ConversationInformation {
         dialog.addEventListener('click', event => {if (event.target === dialog) dialog.close();});
         dialog.addEventListener('close', () => {
             dialog.remove(); if (this.dialog === dialog) this.dialog = undefined;
-            if (this.button.isConnected) (this.button.closest('details')?.querySelector('summary') ?? this.button).focus();
+            if (opener.isConnected) (opener.closest('details')?.querySelector('summary') ?? opener).focus();
         }, {once: true});
         document.body.append(dialog); this.refresh(); dialog.showModal(); void this.loadMetrics(dialog);
     }
@@ -68,6 +85,7 @@ export class ConversationInformation {
             setTimePresentation(element, this.snapshot?.[field], t('project.timeUnknown'));
         }
         dialog.querySelector('[data-session-info-status]')!.textContent = this.status;
+        this.refreshModel(dialog);
         dialog.querySelector('[data-native-writer-lock]')!.textContent = nativeWriterLockText(this.snapshot?.writerLock);
         dialog.querySelector('[data-session-info-observation]')!.textContent = [
             this.snapshot?.observation?.scope ? t(`harness.scope.${this.snapshot.observation.scope}`) : '',
@@ -82,5 +100,19 @@ export class ConversationInformation {
         dialog.querySelector('[data-session-info-usage]')!.textContent = usage;
         dialog.querySelector<HTMLElement>('[data-session-info-meter]')!.hidden = !usage;
     }
-    destroy(): void {this.dialog?.close(); this.dialog?.remove(); this.dialog = undefined; this.button.remove();}
+    private refreshModel(dialog: HTMLDialogElement): void {
+        const list = dialog.querySelector('[data-session-info-executed-model]')!;
+        const model = this.snapshot?.executedModel;
+        const unknown = t('harness.executionValueUnknown');
+        const modelId = [model?.providerId, model?.modelId].filter(Boolean).join(' / ');
+        list.replaceChildren(...(model || this.snapshot?.supportsModels ? [
+            [t('harness.executedModel'), modelId || unknown],
+            [t('harness.executedEffort'), model?.reasoningEffort || unknown],
+        ].flatMap(([label, value]) => {
+            const term = document.createElement('dt'), description = document.createElement('dd');
+            term.textContent = label; description.textContent = value;
+            return [term, description];
+        }) : []));
+    }
+    destroy(): void {this.dialog?.close(); this.dialog?.remove(); this.dialog = undefined; this.button.remove(); this.inlineModel?.remove();}
 }

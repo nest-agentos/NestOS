@@ -145,6 +145,7 @@ export class IndependentConversationEditor extends BaseSettingsEditor<Conversati
             const slot = document.createElement('div'); slot.className = className; if (className) slot.dataset.editorMobileNavigation = 'embedded'; root.append(slot); cleanups.push(mount(slot), () => slot.remove());
         }
         information = this.mountMenu(root, cleanups, menuHost);
+        information.mountInlineModel(context.header?.extra ?? root);
         if (!this.options.mountTitleBar && this.options.hostContext?.toggleSidebar) {
             const button = document.createElement('button'); button.type = 'button';
             presentHostControl(button, t('chat.toolbar.sidebar'), ACTION_ICONS.sidebar);

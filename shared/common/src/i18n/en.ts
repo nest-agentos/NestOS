@@ -2440,6 +2440,9 @@ export const en: LocaleStrings = {
     "image.agentDefault": "image-parser \u00b7 Follow default (1024)",
 
     'harness.followNativeSettings': 'Follow native settings',
+    'harness.executedModel': 'Last used model',
+    'harness.executedEffort': 'Actual reasoning level',
+    'harness.executionValueUnknown': 'Not reported',
     'harness.reasoning': 'Reasoning effort',
     'harness.activity.working': 'Waiting for the next output',
     'harness.activity.reasoning': 'Reasoning',

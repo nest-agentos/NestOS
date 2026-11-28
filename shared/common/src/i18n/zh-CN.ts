@@ -2441,6 +2441,9 @@ export const zhCN = {
     "image.agentDefault": "image-parser · 跟随默认（1024）",
 
     'harness.followNativeSettings': '跟随原生配置',
+    'harness.executedModel': '最近使用的模型',
+    'harness.executedEffort': '实际推理等级',
+    'harness.executionValueUnknown': '未上报',
     'harness.reasoning': '推理强度',
     'harness.activity.working': '等待下一次输出',
     'harness.activity.reasoning': '正在思考',

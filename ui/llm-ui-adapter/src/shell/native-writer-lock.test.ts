@@ -1,7 +1,8 @@
-import type {ConversationSnapshot} from '../contracts';
 // @vitest-environment jsdom
+import type {ConversationSnapshot} from '../contracts';
 import {afterEach, expect, it, vi} from 'vitest';
-import {t} from '@nestos/common';
+import {getLocale, t} from '@nestos/common';
+import {formatDateTime} from '@nestos/ui-common';
 
 import {nativeWriterLockText} from './native-writer-lock';
 import {NativeInstructionQueuePanel} from '../components/NativeInstructionQueuePanel';
@@ -14,7 +15,7 @@ it('shows verified owner identity and labels the unavailable acquisition time ex
         lockFileModifiedAt: 1793427000000, owner: {pid: 42, uid: 1000, processStartedAt: 1793426000000}});
     expect(text).toContain('PID: 42 · UID: 1000');
     expect(text).toContain(t('harness.writerLock.acquiredAt', {time: t('harness.writerLock.unknownTime')}));
-    expect(text).toContain(t('harness.writerLock.processStartedAt', {time: new Date(1793426000000).toLocaleString('zh-CN', {hour12: false})}));
+    expect(text).toContain(t('harness.writerLock.processStartedAt', {time: formatDateTime(new Date(1793426000000), getLocale(), {hour12: false})}));
     expect(nativeWriterLockText(undefined)).toBe(t('harness.writerLock.unavailable'));
 });
 
