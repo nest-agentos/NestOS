@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import {afterEach, beforeEach, expect, it, vi} from 'vitest';
-import {remoteSessionPath} from '@nestos/app-contracts';
+import {projectConversationEntryPath, projectConversationsPath, remoteSessionPath} from '@nestos/app-contracts';
 import {t} from '@nestos/common';
 import {confirmRemoteRemoval, remoteRemovalItems, type RemoteRemovalItem} from '../src/projects/remote-session-removal';
 import {nativeSessionMenu} from '../src/projects/remote-session-management';
@@ -54,6 +54,15 @@ it('keeps read-only navigation projections eligible for host-owned management', 
     expect(remoteRemovalItems([{id: path, metadata: {custom: {_readOnly: true, nativeManagement: {archive: true}}}}]))
         .toMatchObject([{target: {nativeSessionId: 'a'}, capability: {archive: true}}]);
     expect(remoteRemovalItems([{id: '/s', metadata: {custom: {}}}])).toBeUndefined();
+});
+it('classifies remote rows and their aliases without parsing other workbench resources as sessions', () => {
+    const row = (id: string) => ({id, metadata: {custom: {}}});
+    const remote = remoteSessionPath('/P', 'dsh', 'a');
+    const alias = projectConversationEntryPath(projectConversationsPath('/P'), remote);
+    expect(remoteRemovalItems([row(remote), row(alias)])?.map(item => item.target.nativeSessionId)).toEqual(['a', 'a']);
+    for (const id of ['@dream/p', '/@flows/example', '/folder:P/@harness/dsh/%']) {
+        expect(remoteRemovalItems([row(remote), row(id)])).toBeUndefined();
+    }
 });
 it('uses the same archive fallback confirmation from the single-session delete menu', async () => {
     const manage = vi.fn(async () => ({title: 'A', deletedSessionIds: []})), changed = vi.fn(async () => {}), report = vi.fn();

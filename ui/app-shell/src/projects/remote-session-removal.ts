@@ -13,11 +13,19 @@ function removalErrorCode(error: unknown): string {
     return typeof code === 'string' && /^[A-Z][A-Z0-9_]{0,79}$/.test(code) ? code : 'REMOTE_REMOVAL_FAILED';
 }
 
+export function remoteRemovalTarget(id: string): Target | undefined {
+    if (!id.startsWith('/') || !(id.includes('/@harness/') || id.includes('/@entry:'))) return;
+    try {
+        const target = resolveBrowserTarget(id);
+        if (target.kind === 'remote' && target.profileId && target.nativeSessionId) return target;
+    } catch { /* An unavailable route has no remote removal action. */ }
+}
+
 export function remoteRemovalItems(items: readonly {id: string; metadata: {custom: Record<string, unknown>}}[]): RemoteRemovalItem[] | undefined {
     const result: RemoteRemovalItem[] = [];
     for (const item of items) {
-        const target = resolveBrowserTarget(item.id);
-        if (target.kind !== 'remote' || !target.profileId || !target.nativeSessionId) return;
+        const target = remoteRemovalTarget(item.id);
+        if (!target) return;
         result.push({id: item.id, target, capability: item.metadata.custom.nativeManagement as RemoteRemovalItem['capability']});
     }
     return result.length ? result : undefined;

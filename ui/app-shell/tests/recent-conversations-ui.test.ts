@@ -6,7 +6,7 @@ import { DirectoryMountService, ProjectService, SessionFilesService } from '@nes
 import { conversationResourcePath, folderBrowserPath, projectConversationsPath, resolveBrowserTarget } from '@nestos/app-contracts';
 import { createTestWorkbench } from './helpers/application';
 
-it('keeps fifteen sidebar sessions and opens a larger paged view when More is clicked', async () => {
+it('keeps ten sidebar sessions and opens a larger paged view when More is clicked', async () => {
     const {manager} = await createVFS({rootBackend: new MemoryBackend()}), root = await manager.openFileSystem('/');
     const repository = new SessionRepository(root); await repository.init();
     const files = new SessionFilesService(root); await files.initialize();
@@ -33,17 +33,17 @@ it('keeps fifteen sidebar sessions and opens a larger paged view when More is cl
     const sessionRows = () => [...sidebar.querySelectorAll<HTMLElement>('[data-item-id]')].filter(row => resolveBrowserTarget(row.dataset.itemId!).kind === 'session');
     const panel = () => main.querySelector<HTMLElement>('.workbench-tabs__panel:not([hidden])')!;
     try {
-        await workbench.start(); await vi.waitFor(() => expect(sessionRows()).toHaveLength(15));
+        await workbench.start(); await vi.waitFor(() => expect(sessionRows()).toHaveLength(10));
         const more = [...sidebar.querySelectorAll<HTMLElement>('[data-item-id]')].find(row => resolveBrowserTarget(row.dataset.itemId!).kind === 'project-conversations' && row.textContent?.includes('更多会话'))!;
         expect(more).toBeDefined(); more.querySelector<HTMLElement>('.vfs-node-item__title')!.click();
         await vi.waitFor(() => expect(workbench.getActiveResourceId()).toBe(projectConversationsPath(project.path)));
         await vi.waitFor(() => expect(panel().querySelectorAll('[data-resource-id]')).toHaveLength(51));
-        expect(sessionRows()).toHaveLength(15); expect(sidebar.textContent).toContain('Session 69'); expect(sidebar.textContent).not.toContain('Session 0');
+        expect(sessionRows()).toHaveLength(10); expect(sidebar.textContent).toContain('Session 69'); expect(sidebar.textContent).not.toContain('Session 0');
         const search = panel().querySelector<HTMLInputElement>('input[type=search]')!;
         search.value = '0 Session'; search.dispatchEvent(new Event('input'));
         await vi.waitFor(() => expect(panel().querySelectorAll('.project-search__result')).toHaveLength(7));
         expect([...panel().querySelectorAll('.project-search__result')].some(row => row.querySelector('strong')?.textContent === 'Session 0 · NestOS')).toBe(true);
-        expect(panel().querySelector('table')!.hidden).toBe(true); expect(sessionRows()).toHaveLength(15);
+        expect(panel().querySelector('table')!.hidden).toBe(true); expect(sessionRows()).toHaveLength(10);
         search.value = ''; search.dispatchEvent(new Event('input'));
         expect(panel().querySelector('table')!.hidden).toBe(false);
         const older = panel().querySelectorAll<HTMLElement>('[data-resource-id]')[20]!;
@@ -52,12 +52,12 @@ it('keeps fifteen sidebar sessions and opens a larger paged view when More is cl
         await workbench.refresh();
         panel().querySelector<HTMLElement>(`[data-resource-id="${older.dataset.resourceId}"]`)!.dispatchEvent(new MouseEvent('contextmenu', {bubbles: true, cancelable: true}));
         await vi.waitFor(() => expect(document.querySelector('.vfs-context-menu [aria-label="取消收藏"]')).not.toBeNull());
-        expect(sessionRows()).toHaveLength(15); document.body.click();
+        expect(sessionRows()).toHaveLength(10); document.body.click();
         const next = [...panel().querySelectorAll<HTMLElement>('[data-resource-id]')].find(row => resolveBrowserTarget(row.dataset.resourceId!).kind === 'project-conversations')!;
         const nextPath = conversationResourcePath(next.dataset.resourceId!); next.querySelector<HTMLButtonElement>('.workbench-directory__name')!.click();
         await vi.waitFor(() => expect(workbench.getActiveResourceId()).toBe(nextPath));
         await vi.waitFor(() => expect(panel().querySelectorAll('[data-resource-id]')).toHaveLength(20));
-        expect(sessionRows()).toHaveLength(15); expect(panel().textContent).toContain('Session 0');
+        expect(sessionRows()).toHaveLength(10); expect(panel().textContent).toContain('Session 0');
         const contentSearch = panel().querySelector<HTMLInputElement>('input[type=search]')!;
         const scope = panel().querySelector('select')!; scope.value = 'session-prompt'; scope.dispatchEvent(new Event('change'));
         contentSearch.value = 'older user needle'; contentSearch.dispatchEvent(new Event('input'));

@@ -8,7 +8,7 @@ import {conversationLifetime} from './conversation-lifetime';
 import {beginNavigationTiming} from '../navigation/navigation-timing';
 import {parseProjectAction, type ProjectActionRoute} from './project-action-route';
 import type {ChatEditorFactory as EditorFactory, ChatEditorOptions as EditorOptions} from '@nestos/llm-ui-adapter/contracts';
-import {confirmRemoteRemoval, remoteRemovalItems} from './remote-session-removal';
+import {confirmRemoteRemoval, remoteRemovalItems, remoteRemovalTarget} from './remote-session-removal';
 import { PROJECT_ACTION_ICONS } from '@nestos/common';
 import {projectFileSource, type ConversationOpenTrace, type WorkspaceOpenOptions} from '@nestos/app-contracts';
 import {showProjectSettings} from './project-settings';
@@ -145,7 +145,7 @@ function compareSessionEntries(a: VFSNodeUI, b: VFSNodeUI): number | undefined {
         const fixed = fileFirst(a, b);
         if (fixed !== undefined) return fixed;
     }
-    const isSession = (item: VFSNodeUI) => !isFlowPath(item.id) && resolveBrowserTarget(item.id).kind === 'session';
+    const isSession = (item: VFSNodeUI) => !isFlowPath(item.id) && !isProjectDreamResource(item.id) && resolveBrowserTarget(item.id).kind === 'session';
     const aSession = isSession(a), bSession = isSession(b);
     // Keep folder/Flow navigation together so mixed siblings have a transitive order.
     if (aSession !== bSession) return aSession ? 1 : -1;
@@ -421,7 +421,7 @@ export class SessionWorkbench implements WorkspaceController {
         return this.navigationVisible && this.sidebarLayout.activeView === 'navigation';
     }
     private isTransferFile(path: string): boolean {
-        if (isFlowPath(path)) return false;
+        if (!path.startsWith('/') || isFlowPath(path)) return false;
         const target = resolveBrowserTarget(path);
         return (target.kind === 'files' && target.path !== '/') || (target.kind === 'project-files' && target.path !== WORKSPACE_PATH);
     }
@@ -498,9 +498,9 @@ export class SessionWorkbench implements WorkspaceController {
                 run: (node, type) => this.createDirectoryEntry(node.id, type) },
             transferPolicy: {
                 targets: this.projects ? (ids, _mode, parent) => projectTransferTargets(this.projects!, this.navigationFiles!, ids, parent) : undefined,
-                source: (node, mode) => !node.metadata.custom.remoteProject && (mode === 'move' || this.isTransferFile(node.id)),
+                source: (node, mode) => node.id.startsWith('/') && !node.metadata.custom.remoteProject && (mode === 'move' || this.isTransferFile(node.id)),
                 destination: (node, ids) => {
-                    if (!node) return false;
+                    if (!node?.id.startsWith('/') || ids.some(id => !id.startsWith('/'))) return false;
                     const fileSources = ids.every(id => this.isTransferFile(id));
                     const target = resolveBrowserTarget(node.id);
                     return fileSources ? ['files', 'project-files'].includes(target.kind) : target.kind === 'folder';
@@ -540,6 +540,7 @@ export class SessionWorkbench implements WorkspaceController {
             contextMenu: {
                 mapItem: item => projectItems([item])[0] ?? item,
                 bulkItems: (items, defaults) => {
+                    if (items.some(item => !item.id.startsWith('/'))) return [];
                     const remote = remoteRemovalItems(items);
                     if (remote) return [...defaults.filter(entry => !('id' in entry) || !['bulk-delete', 'bulk-move', 'bulk-copy', 'bulk-edit-tags'].includes(entry.id)),
                         {id: 'bulk-delete', label: t('harness.delete'), onClick: () => this.removeRemoteSessions(remote)}];
@@ -547,6 +548,7 @@ export class SessionWorkbench implements WorkspaceController {
                         ? defaults.filter(entry => !('id' in entry) || !['bulk-delete', 'bulk-move', 'bulk-copy'].includes(entry.id)) : defaults;
                 },
                 items: projectIconMenu(withAssistantShortcut((item, defaults) => {
+                    if (isProjectDreamResource(item.id)) return [];
                     if (item.id === '/' && this.projects) return [{id: 'create-project', label: t('project.create'), onClick: () => this.createProject('/')}];
                     if (isFlowPath(item.id)) return this.flows?.menu.items?.(item,
                         item.id === '/@flows' ? [] : defaults.filter(entry => 'id' in entry && entry.id === 'delete')) ?? [];
@@ -2025,9 +2027,7 @@ export class SessionWorkbench implements WorkspaceController {
         parent.append(button); return button;
     }
     private remoteDirectoryBulkActions(): NonNullable<import('../workbench/directory-list').DirectoryListOptions['bulkActions']> {
-        return [{id: 'delete', label: t('harness.delete'), allows: ids => !!ids.length && ids.every(id => {
-            const target = resolveBrowserTarget(id); return target.kind === 'remote' && !!target.nativeSessionId;
-        }), run: async ids => {
+        return [{id: 'delete', label: t('harness.delete'), allows: ids => !!ids.length && ids.every(id => !!remoteRemovalTarget(id)), run: async ids => {
             const nodes = await Promise.all(ids.map(id => this.navigationFiles!.driver.getNode(id)));
             if (nodes.some(node => !node)) throw new Error(t('harness.removalUnavailable'));
             const items = remoteRemovalItems(nodes.map(node => ({id: node!.path, metadata: {custom: node!.metadata ?? {}}})));

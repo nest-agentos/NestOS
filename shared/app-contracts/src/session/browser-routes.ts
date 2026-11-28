@@ -19,6 +19,7 @@ export type FileTarget = Extract<BrowserTarget, { kind: 'files' | 'project-files
 export function isFileTarget(target: BrowserTarget): target is FileTarget { return target.kind === 'files' || target.kind === 'project-files'; }
 
 export const FOLDER_SEGMENT_PREFIX = 'folder:';
+export const PROJECT_SIDEBAR_PREVIEW_LIMIT = 10;
 
 export function isFolderSegment(segment: string): boolean {
     return segment.startsWith(FOLDER_SEGMENT_PREFIX) && segment.length > FOLDER_SEGMENT_PREFIX.length;

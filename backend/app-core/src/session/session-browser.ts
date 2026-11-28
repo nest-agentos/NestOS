@@ -4,7 +4,7 @@ import {readDirectoryView} from './directory-view';
 import { SessionActivityProjection } from './session-activity';
 import { RemoteSessionProjection } from './remote-session-projection';
 import { conversationDirectory, conversationDirectoryNode, conversationNavigationNodes } from '../projects/conversation-directory';
-import { conversationResourcePath } from '@nestos/app-contracts';
+import { conversationResourcePath, PROJECT_SIDEBAR_PREVIEW_LIMIT } from '@nestos/app-contracts';
 import { FOLDER_SEGMENT_PREFIX, isFolderSegment, isFileTarget, filesBrowserPrefix, parentBrowserPath, browserName,
     resolveBrowserTarget, browserTargetFolder, folderBrowserPath, folderPathFromBrowserPath, type FileTarget, type BrowserTarget } from './browser-routes';
 export { resolveBrowserTarget, browserTargetFolder, folderBrowserPath, folderPathFromBrowserPath } from './browser-routes';
@@ -353,13 +353,14 @@ class BrowserBackend implements IStorageBackend {
         const folders = await this.folders();
         const groups = [project.path, ...folders.filter(folder => folder.parentPath === project.path && folder.name === '@sessions').map(folder => folder.path)];
         const agentId = this.agentFilter;
+        const limit = target.recent ? PROJECT_SIDEBAR_PREVIEW_LIMIT + 1 : 51;
         const local = groups.map(folder => ({id: '@nestos:' + folder,
             cursorAfter: (node: FSNode) => JSON.stringify([node.modifiedAt, browserName(node.path)]),
             read: async (cursor?: string) => {
-                const page = await this.deps.repository.listSummaryPage(folder, {cursor, limit: target.recent ? 16 : 51, agentId});
+                const page = await this.deps.repository.listSummaryPage(folder, {cursor, limit, agentId});
                 return {nodes: this.sessionNodes(page.items, folder, agentId ?? null), nextCursor: page.nextCursor};
             }}));
-        return conversationDirectory(path, target, local, () => this.remoteSessions.timeline(project, agentId, target.recent ? 16 : 51), agentId);
+        return conversationDirectory(path, target, local, () => this.remoteSessions.timeline(project, agentId, limit), agentId);
     }
     private async listFiles(path: string, target: FileTarget): Promise<FSNode[]> {
         return this.withFiles(target, fs => this.fileNodes(path, target, fs));

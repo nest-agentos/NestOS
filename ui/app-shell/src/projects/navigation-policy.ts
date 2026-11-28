@@ -31,7 +31,11 @@ export function fileFirst(a: VFSNodeUI, b: VFSNodeUI): number | undefined {
     if (defaultOrder) return defaultOrder;
     const priority = navigationPriority(a.id) - navigationPriority(b.id);
     if (priority) return priority;
-    const session = (item: VFSNodeUI) => { const target = resolveBrowserTarget(item.id); return target.kind === 'session' || target.kind === 'remote' && !!target.nativeSessionId; };
+    const session = (item: VFSNodeUI) => {
+        if (isProjectDreamResource(item.id)) return false;
+        const target = resolveBrowserTarget(item.id);
+        return target.kind === 'session' || target.kind === 'remote' && !!target.nativeSessionId;
+    };
     if (session(a) && session(b)) return ((Date.parse(b.metadata.lastModified) || 0) - (Date.parse(a.metadata.lastModified) || 0)) || a.id.localeCompare(b.id);
     return undefined;
 }
@@ -67,11 +71,11 @@ export function projectItems(items: VFSNodeUI[], query = ''): VFSNodeUI[] {
     });
 }
 
-export function projectDreamItem(projectId: string): VFSNodeUI {
+export function projectDreamItem(projectId: string, parentId: string | null = null): VFSNodeUI {
     const id = projectDreamResource(projectId);
-    return {id, parentId: null, version: '1', kind: 'group', type: 'file', icon: ACTION_ICONS.calendarView,
+    return {id, parentId, version: '1', kind: 'group', type: 'file', icon: ACTION_ICONS.calendarView,
         presentation: {fileDetails: false},
-        metadata: {path: id, parentPath: null, title: t('dream.title'), tags: [], createdAt: '', lastModified: '',
+        metadata: {path: id, parentPath: parentId, title: t('dream.title'), tags: [], createdAt: '', lastModified: '',
             custom: {_fixedEntry: true, _readOnly: true, navigationMenu: true}}};
 }
 

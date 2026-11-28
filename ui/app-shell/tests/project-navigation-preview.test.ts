@@ -6,7 +6,7 @@ import {SessionRepository} from '@nestos/llm-session';
 import {DirectoryMountService, SessionFilesService, ProjectService, folderBrowserPath} from '@nestos/app-core';
 import {createTestWorkbench} from './helpers/application';
 
-it('limits sidebar files and favorites to 15 and opens complete canonical directories in the main pane', async () => {
+it('previews ten files and fifteen favorites and opens complete directories in the main pane', async () => {
     const storage = new Map<string, string>();
     vi.stubGlobal('localStorage', {getItem: (key: string) => storage.get(key) ?? null, setItem: (key: string, value: string) => storage.set(key, value)});
     vi.stubGlobal('requestAnimationFrame', (fn: FrameRequestCallback) => setTimeout(fn, 0));
@@ -32,17 +32,17 @@ it('limits sidebar files and favorites to 15 and opens complete canonical direct
         kernel: kernel as any, factory: vi.fn(async () => ({destroy() {}})) as any, onSelect() {}});
     try {
         await workbench.start(); await workbench.openResource(path);
-        for (const [segment, label] of [['@files', 'project.moreFiles'], ['@favorites', 'project.moreFavorites']] as const) {
+        for (const [segment, label, limit] of [['@files', 'project.moreFiles', 10], ['@favorites', 'project.moreFavorites', 15]] as const) {
             const directory = path + '/' + segment;
             const rows = () => sidebar.querySelectorAll(`[data-item-id="${directory}"] [data-item-type="file"]`);
             sidebar.querySelector<HTMLElement>(`[data-item-id="${directory}"] [data-action="toggle-folder"]`)!.click();
-            await vi.waitFor(() => expect(rows()).toHaveLength(15));
+            await vi.waitFor(() => expect(rows()).toHaveLength(limit));
             const more = sidebar.querySelector<HTMLButtonElement>(`[data-preview-id="${directory}"]`)!;
             expect(more.textContent).toBe('… ' + t(label)); more.click();
             await vi.waitFor(() => expect(workbench.getActiveResourceId()).toBe(directory));
             const panel = main.querySelector('.workbench-tabs__panel:not([hidden])')!;
             await vi.waitFor(() => expect(panel.querySelectorAll('tbody tr[data-resource-id]')).toHaveLength(17));
-            expect(rows()).toHaveLength(15);
+            expect(rows()).toHaveLength(limit);
             expect([...panel.querySelectorAll<HTMLElement>('tbody tr[data-resource-id]')]
                 .every(row => row.dataset.resourceId?.startsWith(directory + '/'))).toBe(true);
         }

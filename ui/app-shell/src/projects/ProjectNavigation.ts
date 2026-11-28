@@ -308,10 +308,13 @@ export class ProjectNavigation {
             const id = item.metadata.custom.projectId;
             const isDefault = typeof id === 'string' && id === this.defaultProjectId;
             const indicator = typeof id === 'string' ? this.actions.syncIndicator?.(id) : undefined;
+            const children = item.children && this.syncItems(item.children);
+            if (!this.project && this.actions.showDream && typeof id === 'string' && children)
+                children.push(projectDreamItem(id, item.id));
             return {...item, ...(indicator ? {icon: projectSyncIcon(item.metadata.custom.remoteProject === true, indicator)} : {}),
                 metadata: {...item.metadata, title: item.metadata.title + (isDefault ? ` · ${t('project.default.badge')}` : ''),
                     custom: {...item.metadata.custom, defaultProject: isDefault}},
-                children: item.children && this.syncItems(item.children)};
+                children};
         });
     }
     async refresh(initial?: ProjectNavigationView): Promise<void> {

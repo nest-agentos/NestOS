@@ -46,14 +46,14 @@ it('keeps a remote session favorite distinct from offline project files', async 
     expect(rows.find(row => row.metadata.title === 'File')?.metadata._disabled).toBe(true);
 });
 
-it('projects fifteen mixed recent sessions and pages the complete collection through a contained VFS', async () => {
+it('projects ten mixed recent sessions and pages the complete collection through a contained VFS', async () => {
     const {project, peer, fs} = await setup(), root = folderBrowserPath(project.path), recentPath = projectConversationsPath(project.path, {recent: true});
     const rootRows = await fs.driver.getChildren(root);
     expect(rootRows.find(row => row.path === recentPath)?.metadata.navigationTransparent).toBe(true);
     const recent = await fs.driver.getChildren(recentPath), sessions = recent.filter(row => isSession(row.path));
-    expect(sessions).toHaveLength(15); expect(peer.list).toHaveBeenCalledTimes(3); expect(peer.inspect).not.toHaveBeenCalled();
+    expect(sessions).toHaveLength(10); expect(peer.list).toHaveBeenCalledTimes(3); expect(peer.inspect).not.toHaveBeenCalled();
     expect(new Set(sessions.map(row => row.metadata.harnessKind))).toEqual(new Set(['nestos', 'codex', 'dsht', 'claudecode']));
-    expect(sessions.map(row => row.modifiedAt)).toEqual(Array.from({length: 15}, (_, i) => 10000 - i));
+    expect(sessions.map(row => row.modifiedAt)).toEqual(Array.from({length: 10}, (_, i) => 10000 - i));
     expect((await fs.driver.getNode(sessions[0]!.path))?.metadata.navigationTarget).toBe(conversationResourcePath(sessions[0]!.path));
     expect(recent.every(row => row.parentPath === recentPath)).toBe(true);
     const more = recent.find(row => row.metadata.conversationMore)!;
@@ -74,7 +74,7 @@ it('keeps healthy harnesses visible after one failure and respects read-only cre
     const {project, peer, mounts, fs} = await setup(), read = peer.list.getMockImplementation()!;
     peer.list.mockImplementation(async (profile, query) => {if (profile === 'codex') throw new Error('offline'); return read(profile, query);});
     const rows = await fs.driver.getChildren(projectConversationsPath(project.path, {recent: true}));
-    expect(rows.filter(row => isSession(row.path))).toHaveLength(15);
+    expect(rows.filter(row => isSession(row.path))).toHaveLength(10);
     expect(rows.some(row => row.metadata._disabled)).toBe(true);
     expect(rows.some(row => row.metadata.harnessKind === 'dsht')).toBe(true);
     mounts[0]!.access = 'ro';
@@ -89,7 +89,7 @@ it('filters before recent and full pagination, keeps files/favorites, and isolat
     expect(root.some(row => resolveBrowserTarget(row.path).kind === 'favorites')).toBe(true);
     expect(root.some(row => resolveBrowserTarget(row.path).kind === 'project-files')).toBe(true);
     const recent = (await fs.driver.getChildren(projectConversationsPath(project.path, {recent: true}))).filter(row => isSession(row.path));
-    expect(recent).toHaveLength(15); expect(recent.every(row => row.metadata.createdWithAgentId === 'writer')).toBe(true);
+    expect(recent).toHaveLength(10); expect(recent.every(row => row.metadata.createdWithAgentId === 'writer')).toBe(true);
     const first = await fs.driver.getChildren(collection), next = first.find(row => row.metadata.conversationMore)!.path;
     expect(first.filter(row => isSession(row.path))).toHaveLength(50);
     expect((await fs.driver.getChildren(next)).filter(row => isSession(row.path))).toHaveLength(11);
@@ -110,7 +110,7 @@ it('shows one fixed new-conversation entry in remote projects and filters the se
     await expect(composer.prepare()).rejects.toMatchObject({code: 'EACCES'});
     await browser!.setSessionFilter!('remote:' + JSON.stringify(['server', 'codex']));
     const entries = await fs.driver.getChildren(projectConversationsPath(project.path, {recent: true}));
-    expect(entries.filter(row => isSession(row.path))).toHaveLength(15);
+    expect(entries.filter(row => isSession(row.path))).toHaveLength(10);
     expect(entries.filter(row => isSession(row.path)).every(row => row.metadata.harnessProfileId === 'codex')).toBe(true);
 });
 

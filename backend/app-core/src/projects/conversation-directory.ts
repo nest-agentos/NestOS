@@ -1,5 +1,5 @@
 import { CHAT_ICONS, harnessPresentation, t } from '@nestos/common';
-import { projectConversationsPath, projectConversationEntryPath, remoteSessionPath, resolveBrowserTarget, type BrowserTarget } from '@nestos/app-contracts';
+import { PROJECT_SIDEBAR_PREVIEW_LIMIT, projectConversationsPath, projectConversationEntryPath, remoteSessionPath, resolveBrowserTarget, type BrowserTarget } from '@nestos/app-contracts';
 import type { FSNode } from '@nestos/vfs-core';
 import type { RemoteSessionProjection } from '../session/remote-session-projection';
 import { readConversationPage, type ConversationSource } from './conversation-page';
@@ -42,11 +42,11 @@ export function recentConversationPreview(folder: string, nodes: FSNode[]): FSNo
         const target = resolveBrowserTarget(String(node.metadata.navigationTarget ?? node.path));
         return target.kind === 'session' || target.kind === 'remote' && !!target.nativeSessionId;
     });
-    const preview = sessions.slice(0, 15).map(node => aliasNode(directory,
+    const preview = sessions.slice(0, PROJECT_SIDEBAR_PREVIEW_LIMIT).map(node => aliasNode(directory,
         {...node, path: String(node.metadata.navigationTarget ?? node.path)}));
     for (const node of nodes.filter(node => node.metadata._disabled))
         preview.push(aliasNode(directory, {...node, path: String(node.metadata.navigationTarget ?? node.path)}));
-    if (sessions.length > 15 || nodes.some(node => node.metadata.conversationMore))
+    if (sessions.length > PROJECT_SIDEBAR_PREVIEW_LIMIT || nodes.some(node => node.metadata.conversationMore))
         preview.push(continuationNode(directory, {kind: 'project-conversations', folder, recent: true}, ''));
     return preview;
 }
@@ -55,7 +55,7 @@ export async function conversationDirectory(directory: string, target: Extract<B
     local: ConversationSource[], remote: () => ReturnType<RemoteSessionProjection['timeline']>, agentId?: string): Promise<FSNode[]> {
     const timeline = await remote();
     try {
-        const page = await readConversationPage([...local, ...timeline.sources], filteredCursor(target.cursor, agentId), target.recent ? 15 : 50);
+        const page = await readConversationPage([...local, ...timeline.sources], filteredCursor(target.cursor, agentId), target.recent ? PROJECT_SIDEBAR_PREVIEW_LIMIT : 50);
         const errors = page.errors.map(({source}) => unavailableNode(target.folder, source));
         const actions = target.recent ? [] : timeline.actions.filter(action => !action.path.endsWith('/@new'));
         const nodes = [...actions, ...page.nodes, ...errors].map(node => aliasNode(directory, node));
