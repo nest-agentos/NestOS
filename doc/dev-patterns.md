@@ -41,6 +41,8 @@ Provider 的“测试连接”统一使用用户选定的文本模型：目录�
 
 媒体操作的默认测试输入保存在应用层 `ui/app-shell/src/config/media-probe-examples.json`，按 image.generate / speech.synthesize 声明。宿主将同一份示例注入 Provider 配置页、新建配置弹窗和「模型与服务」页；设置组件只消费 MediaProbeExamples，不内置产品提示词或从 i18n 读取测试正文。用户编辑或清空输入后，同一表单刷新保留当前内容；示例不写入 Provider JSON，不自动发起生成请求。
 
+「模型与服务」也可按看板设置默认决策 Harness。该入口复用看板的 `harness-decision` 和修订校验。新建决策时可手动覆盖，已有决策会话继续使用绑定的 Harness。
+
 reasoning 声明属于模型，reasoningByProtocol 可针对具体路由协议覆盖或禁用；包含 efforts（稳定 ID、显示名及可选 API 值）、canDisable、defaultEffort、预算范围及 transport。未声明不生成一组猜测的等级；服务端默认与显式关闭分开。设置页与聊天输入按实际模型显示选项，主力/常规/快速是路由档位，不是推理等级。切换模型恢复当前会话中该路由的选择，不改变全局默认。旧的未声明能力请求保留兼容；明确声明的等级、关闭和预算在通信前校验。
 
 内置目录是产品预设，厂商变更只更新 presets；通信模块不按模型名称猜协议。豆包文本目录与语音服务分开配置，Seedream 使用 volcengine-images 原生图片适配器及显式能力。参照 [方舟文本目录](https://docs.volcengine.com/docs/ark/model-list?lang=zh)、[图片 API](https://docs.volcengine.com/docs/ark/image-generation-api?lang=zh)、[语音 HTTP API](https://docs.volcengine.com/docs/DoubaoVoice/unidirectional-streaming-text-to-speech-http?lang=zh) 与 [DeepSeek 模型元数据](https://api-docs.deepseek.com/api/list-models/)，本次核对日期为 2026-10-22；目录声明不是账号权限验证。

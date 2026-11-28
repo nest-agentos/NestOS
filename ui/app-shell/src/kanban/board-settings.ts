@@ -11,20 +11,31 @@ export class KanbanBoardSettings {
     private generation=0;
     private closed=false;
     constructor(private readonly service:KanbanClient,private readonly changed:()=>Promise<void>,private readonly saved:()=>void,
-        private readonly busy:(value:boolean)=>void) {}
+        private readonly busy:(value:boolean)=>void, private readonly fieldName?:string) {}
     async select(boardId?:string):Promise<void> {
         const generation=++this.generation;this.element.replaceChildren();if(this.closed)return;
-        const title=document.createElement('h3');title.textContent=label('settingsTitle');this.element.append(title);
-        if(!boardId){const help=document.createElement('p');help.textContent=label('boardControl.selectBoard');this.element.append(help);return;}
+        if(!this.fieldName){const title=document.createElement('h3');title.textContent=label('settingsTitle');this.element.append(title);}
+        if(!boardId){
+            if(!this.fieldName){const help=document.createElement('p');help.textContent=label('boardControl.selectBoard');this.element.append(help);}
+            return;
+        }
         const cached=this.drafts.get(boardId);if(cached){this.element.append(cached.form);return;}
         const status=document.createElement('p');status.setAttribute('role','status');status.textContent=label('boardControl.loading');this.element.append(status);
         const operationId=randomUUID(),started=performance.now();
         try {
-            const [board,catalog]=await Promise.all([this.service.read(boardId),this.service.boardSettings?.(boardId)??{fields:[]}]);
+            const [board,catalog]=await Promise.all([this.board(boardId),this.service.boardSettings?.(boardId)??{fields:[]}]);
             if(this.closed||generation!==this.generation)return;
-            const draft=this.create(board,catalog);this.drafts.set(boardId,draft);status.remove();this.element.append(draft.form);
+            const visible=this.fieldName?{fields:catalog.fields.filter(field=>field.name===this.fieldName)}:catalog;
+            if(this.fieldName&&!visible.fields.length)throw Object.assign(new Error('Harness settings unavailable'),{code:'KANBAN_HARNESS_UNAVAILABLE'});
+            const draft=this.create(board,visible);this.drafts.set(boardId,draft);status.remove();this.element.append(draft.form);
             log.debug('settings.read',{operationId,boardId,stage:'catalog.read',result:'success',count:catalog.fields.length,durationMs:Math.round(performance.now()-started)});
         } catch(error){if(!this.closed&&generation===this.generation){this.failure(status,error,operationId,boardId,'catalog.read',started);const retry=document.createElement('button');retry.type='button';retry.textContent=label('refresh');retry.onclick=()=>{void this.select(boardId);};this.element.append(retry);}}
+    }
+    private async board(id:string):Promise<KanbanBoardSummary> {
+        if(!this.fieldName)return this.service.read(id);
+        const board=(await this.service.catalog(id)).find(board=>board.id===id);
+        if(!board)throw Object.assign(new Error('Board unavailable'),{code:'ENOENT'});
+        return board;
     }
     observeControl(board:KanbanBoardSummary,previousRevision:number):void {
         const draft=this.drafts.get(board.id);
@@ -32,7 +43,7 @@ export class KanbanBoardSettings {
     }
     destroy():void {this.closed=true;this.generation++;this.drafts.clear();this.element.remove();}
     private create(board:KanbanBoardSummary,catalog:KanbanBoardSettingsCatalog):Draft {
-        const form=document.createElement('form');form.dataset.boardSettings=board.id;form.innerHTML=boardSettingsFields(board,catalog,label);
+        const form=document.createElement('form');form.dataset.boardSettings=board.id;form.innerHTML=boardSettingsFields(board,catalog,this.fieldName?undefined:label);
         const status=document.createElement('p');status.setAttribute('role','status');form.append(status);
         const save=document.createElement('button');save.type='submit';save.textContent=label('save');
         const refresh=document.createElement('button');refresh.type='button';refresh.textContent=label('refresh');
@@ -42,18 +53,25 @@ export class KanbanBoardSettings {
     private async submit(draft:Draft,status:HTMLElement):Promise<void> {
         if(this.closed||draft.form.getAttribute('aria-busy')==='true')return;
         const command=draft.unknown&&draft.fingerprint?JSON.parse(draft.fingerprint) as ReturnType<typeof boardSettingsCommand>
-            :boardSettingsCommand(new FormData(draft.form),draft.catalog,draft.board.settings??{});
+            :this.command(draft);
         const fingerprint=JSON.stringify(command);
         if(draft.fingerprint!==fingerprint){draft.operationId=randomUUID();draft.fingerprint=fingerprint;}
         const operationId=draft.operationId!,started=performance.now();this.busy(true);draft.form.setAttribute('aria-busy','true');
         status.setAttribute('role','status');status.textContent=label('boardControl.processing');
         this.disable(draft,true);
         try {
-            await this.service.execute(draft.board.id,{operationId,expectedRevision:draft.board.revision,command});
+            const result=await this.service.execute(draft.board.id,{operationId,expectedRevision:draft.board.revision,command});
             log.debug('settings.save',{operationId,boardId:draft.board.id,stage:'commit',result:'success',durationMs:Math.round(performance.now()-started)});
-            this.drafts.delete(draft.board.id);this.saved();await this.changed();
+            if(this.fieldName){
+                draft.board=result;draft.operationId=undefined;draft.fingerprint=undefined;draft.unknown=false;
+                status.textContent=t('modelDefaults.decisionSaved');
+            }else{this.drafts.delete(draft.board.id);this.saved();await this.changed();}
         } catch(error){draft.unknown=(error as {outcome?:string})?.outcome==='unknown';if(!this.closed)this.failure(status,error,operationId,draft.board.id,'commit',started);}
         finally{draft.form.removeAttribute('aria-busy');this.disable(draft,false);this.busy(false);}
+    }
+    private command(draft:Draft):ReturnType<typeof boardSettingsCommand> {
+        const command=boardSettingsCommand(new FormData(draft.form),draft.catalog,draft.board.settings??{});
+        return this.fieldName?{type:command.type,settings:command.settings}:command;
     }
     private disable(draft:Draft,saving:boolean):void {
         draft.form.querySelectorAll<HTMLButtonElement|HTMLSelectElement|HTMLInputElement>('button,select,input').forEach(input=>{input.disabled=saving||!!draft.unknown&&(input.tagName==='SELECT'||input.tagName==='INPUT'||input instanceof HTMLButtonElement&&input.type==='button');});

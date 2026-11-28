@@ -51,6 +51,7 @@ export interface SettingsFactoryOptions {
     diagnostics?: import('@nestos/app-contracts/services').ApplicationDiagnostics;
     mediaProbeExamples?: MediaProbeExamples;
     ocr?: import('@nestos/app-contracts/services').OcrControls;
+    modelDefaultsSection?: (container: HTMLElement) => Promise<{destroy(): void}>;
     settingsService: SettingsService;
     agentService: IAgentManagementService;
     connectionService: IConnectionService;
@@ -61,7 +62,7 @@ export interface SettingsFactoryOptions {
     requestDelete?: import('@nestos/ui-common-adapter').EditorHostContext['requestDelete'];
 }
 export const createSettingsFactory = ({ settingsService, agentService, connectionService, llmUiEditors,
-    connectBrowser, restoreFlows, initialFiles, requestDelete, ocr, mediaProbeExamples, diagnostics, serverTerminals, cells }: SettingsFactoryOptions): EditorFactory => {
+    connectBrowser, restoreFlows, initialFiles, requestDelete, ocr, mediaProbeExamples, diagnostics, serverTerminals, cells, modelDefaultsSection }: SettingsFactoryOptions): EditorFactory => {
     return async (container: HTMLElement, options: EditorOptions) => {
         if (requestDelete) options = { ...options, hostContext: { toggleSidebar: () => {}, navigate: async () => {}, ...options.hostContext, requestDelete } };
         const nodeId = resolveSettingsSlug(editorResourceId(options) || '');
@@ -73,7 +74,10 @@ export const createSettingsFactory = ({ settingsService, agentService, connectio
         switch (nodeId) {
             case 'cells': editor = new CellsSettingsEditor(container, cells, options); break;
             case 'terminal': editor = new TerminalSettingsEditor(container, serverTerminals, options); break;
-            case 'model-defaults': editor = new editors!.ModelDefaultsEditor(container, connectionService, options, ocr); break;
+            case 'model-defaults': {
+                if (!modelDefaultsSection) { editor = new editors!.ModelDefaultsEditor(container, connectionService, options, ocr); break; }
+                return mountModelDefaults(container, editors!, connectionService, options, modelDefaultsSection, ocr);
+            }
             case 'storage':     editor = new StorageSettingsEditor(container, settingsService, options); break;
             case 'tags':        editor = new TagSettingsEditor(container, settingsService, options); break;
             case 'contacts':    editor = new ContactSettingsEditor(container, settingsService, options); break;
@@ -100,3 +104,31 @@ export const createSettingsFactory = ({ settingsService, agentService, connectio
         return editor!;
     };
 };
+
+async function mountModelDefaults(container: HTMLElement, editors: LLMUIEditors, service: IConnectionService, options: EditorOptions,
+    mountSection: NonNullable<SettingsFactoryOptions['modelDefaultsSection']>, ocr: SettingsFactoryOptions['ocr']): Promise<IEditor> {
+    const models = document.createElement('div'), extension = document.createElement('div');
+    const hadSettingsClass = container.classList.contains('settings-root');
+    container.classList.add('settings-root', 'model-defaults-host');
+    container.replaceChildren(models, extension);
+    const editor = new editors.ModelDefaultsEditor(models, service, options, ocr);
+    const section = mountSection(extension);
+    const destroy = editor.destroy.bind(editor);
+    editor.destroy = async () => {
+        try { await destroy(); } finally {
+            (await section.catch(() => undefined))?.destroy();
+            container.classList.remove('model-defaults-host');
+            if (!hadSettingsClass) container.classList.remove('settings-root');
+            models.remove();
+            extension.remove();
+        }
+    };
+    try {
+        // The injected settings editors expose their initialization hook.
+        await Promise.all([(editor as IEditor & {init(container: HTMLElement): Promise<void>}).init(models), section]);
+        return editor;
+    } catch (error) {
+        await editor.destroy();
+        throw error;
+    }
+}
