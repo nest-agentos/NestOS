@@ -2,10 +2,11 @@ import type {OperationOptions} from '@nestos/vfs-core';
 import type {RemoteAuthorizationInspection} from '@nestos/app-contracts/services';
 import type {ProjectRemoteMount, RemoteFileConnection, RemoteFileSourceProvider} from './remote-mounts';
 import {diagnosticFailure} from '../diagnostics/failure';
+import type {RemoteProject} from '@nestos/cells-driver';
 
 /** Only read capabilities offered to the current principal; never infer a grant from MCP connectivity. */
 export async function inspectAuthorization(provider: RemoteFileSourceProvider, connection: Omit<RemoteFileConnection, 'alias'>,
-    mount: ProjectRemoteMount, options?: OperationOptions): Promise<RemoteAuthorizationInspection> {
+    mount: ProjectRemoteMount, options?: OperationOptions, onProject?: (project: RemoteProject) => void): Promise<RemoteAuthorizationInspection> {
     const result: RemoteAuthorizationInspection = {checkedAt: Date.now(), authentication: 'unknown', exportAccess: 'unknown', projectAccess: 'unknown', reason: 'unverified'};
     if (!provider.projects) return result;
     const client = provider.projects(connection);
@@ -16,6 +17,7 @@ export async function inspectAuthorization(provider: RemoteFileSourceProvider, c
         if (!root) return {...result, projectAccess: 'denied', reason: 'export-not-granted', code: 'REMOTE_EXPORT_NOT_GRANTED'};
         if (!mount.serverProjectId) return result;
         const project = await client.read(mount.serverProjectId, options);
+        onProject?.(project);
         return {...result, projectAccess: project.access, projectId: project.id, projectRevision: project.revision, principalId: project.authorization?.principalId,
             authorizationRevision: project.authorization?.revision, capabilities: project.capabilities,
             reason: project.revision !== mount.serverProjectRevision || project.authorization?.revision !== mount.authorization?.revision ? 'binding-outdated' : 'available'};

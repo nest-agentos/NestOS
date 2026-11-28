@@ -3,6 +3,7 @@ import {CellsAuthorizationRefreshes} from './cells-authorization-refresh';
 import {remoteClientState} from './remote-client-state';
 import {CellsDraftChecks} from './cells-draft-checks';
 import {inspectAuthorization} from './authorization-inspection';
+import {fileBindingIdentity, sameFileAuthorization} from './file-binding-identity';
 import {verifyDreamAuthorization, type DreamReadCapability} from './dream-authorization';
 import {DiagnosticJournal} from '../diagnostics/journal';
 import {diagnosticFailure} from '../diagnostics/failure';
@@ -59,7 +60,8 @@ export interface RemoteFileSourceProvider {
     capabilities?(connection: Omit<RemoteFileConnection, 'alias'>, options?: OperationOptions): Promise<ExecutionCapabilities>;
     clearCredential?(reference: string): void;
     setCredential(reference: string, secret: string): void | (() => void);
-    open(connection: RemoteFileConnection, options?: OperationOptions): Promise<FileSystemSourceOwner>;
+    open(connection: RemoteFileConnection & {recoverProjectRevision?: (revision: number, options: OperationOptions) => Promise<number>},
+        options?: OperationOptions): Promise<FileSystemSourceOwner>;
     check?(connection: Omit<RemoteFileConnection, 'alias'>, options?: OperationOptions): Promise<void>;
     browse?(connection: Omit<RemoteFileConnection, 'alias'>, path: string, cursor?: string, options?: OperationOptions): Promise<{ paths: string[]; nextCursor: string | null }>;
     checkDraft?(connection: Omit<RemoteFileConnection, 'alias'>, password: string, options?: OperationOptions): Promise<void>;
@@ -67,7 +69,7 @@ export interface RemoteFileSourceProvider {
 }
 export interface ProjectRemoteMount extends RemoteFileConnection {
     capabilities?: import('@nestos/cells-driver').RemoteProjectCapabilities;
-    serverProjectId?: string; serverProjectRevision?: number; serverId?: string; mountId: string; at: string; root: string; access: 'ro' | 'rw'; connectionId?: string;
+    serverProjectId?: string; serverProjectRevision?: number; fileBindingIdentity?: string; serverId?: string; mountId: string; at: string; root: string; access: 'ro' | 'rw'; connectionId?: string;
 }
 export type RemoteConnectionStatus = 'unknown' | 'checking' | 'online' | 'offline';
 type ChannelOperation='open'|'messages'|'close'|'requests'|'respond'|'current'|'acknowledge';
@@ -101,7 +103,8 @@ export class ProjectRemoteMountService {
     private readonly states = new Map<string, RemoteConnectionStatus>();
     private readonly projectIssues = new Map<string, Map<string, DiagnosticEvent>>();
     private readonly guardedClients = new WeakSet<HarnessClient>();
-    private readonly authorizationInspections = new Map<string, {fingerprint: string; value: import('@nestos/app-contracts/services').RemoteAuthorizationInspection}>();
+    private readonly authorizationInspections = new Map<string, {fingerprint: string; fileBindingIdentity?: string;
+        value: import('@nestos/app-contracts/services').RemoteAuthorizationInspection}>();
     private readonly observations = new Map<string, {checkedAt: number; lastSuccessAt?: number; failure?: DiagnosticEvent}>();
     private readonly connectionStates = new Map<string, RemoteConnectionStatus>();
     private readonly listeners = new Set<(change?:ProjectRemoteMountChange) => void>();
@@ -379,7 +382,9 @@ export class ProjectRemoteMountService {
         if(mounts.some(mount=>mount.access==='rw'&&(project.access!=='rw'||!project.capabilities?.fileWrite)
             ||Object.entries(mount.capabilities??{}).some(([key,allowed])=>allowed&&!project.capabilities?.[key as keyof typeof project.capabilities])))
             throw new FSError('EACCES','Saved project permissions changed');
-        return mounts.map(mount=>({...mount,mountId:randomUUID(),authorization:project.authorization,serverProjectRevision:project.revision}));
+        const identity = fileBindingIdentity(project);
+        return mounts.map(mount=>({...mount,mountId:randomUUID(),authorization:project.authorization,serverProjectRevision:project.revision,
+            fileBindingIdentity:identity}));
     }
     async checkDraft(input: RemoteFileSystemInput, password: string, id?: string, options?: OperationOptions): Promise<void> {
         const value = normalizeConnection(input);
@@ -533,6 +538,7 @@ export class ProjectRemoteMountService {
                     const remote=await client.register({name:options?.projectName ?? projectId,alias:mount.alias,path:mount.root.replace(/^\//,''),access,createDirectory:options?.createDirectory},options);
                     if (remote.alias!==mount.alias || remote.path!==mount.root.replace(/^\//,'') || access==='rw' && remote.access!=='rw') throw new FSError('EACCES','Server project grant does not match the requested root');
                     mount.serverProjectId=remote.id; mount.serverProjectRevision=remote.revision;
+                    mount.fileBindingIdentity=fileBindingIdentity(remote);
                     mount.capabilities=remote.capabilities ? {...remote.capabilities,fileWrite:remote.capabilities.fileWrite && access==='rw'} : undefined;
                     for (const extra of remote.mounts) {
                         if (!extra.at.startsWith('/workspace/')) throw new FSError('EACCES','Server project mount outside the project');
@@ -541,7 +547,7 @@ export class ProjectRemoteMountService {
                     }
                 } finally {await client.close();}
             } else if (options?.createDirectory) throw new FSError('ECAPABILITY','Server project creation is unavailable');
-            const owner = await this.provider.open(mount, options);
+            const owner = await this.openMountSource(mount, projectId, options);
             try {
                 if ((await owner.fs.driver.getNode(mount.root, options))?.type !== 'directory') throw new FSError('ENOTDIR', 'Remote project path must be a directory');
                 if (access === 'rw' && (await owner.fs.capabilitiesAt(mount.root, options)).readonly) throw new FSError('EROFS', 'Source is read-only');
@@ -693,7 +699,8 @@ export class ProjectRemoteMountService {
         }));
     }
     private reboundGrants(root:ProjectRemoteMount,project:RemoteProject):ProjectRemoteMount[] {
-        const base={...root,serverProjectRevision:project.revision,authorization:project.authorization,capabilities:project.capabilities};
+        const base={...root,serverProjectRevision:project.revision,authorization:project.authorization,capabilities:project.capabilities,
+            fileBindingIdentity:fileBindingIdentity(project)};
         const declarations=[{alias:project.alias,path:project.path,access:project.access,at:'/workspace'},...project.mounts];
         return declarations.map(m=>{
             if(m.at!=='/workspace'&&!m.at.startsWith('/workspace/'))throw new FSError('EACCES','Remote mount outside project');
@@ -720,7 +727,8 @@ export class ProjectRemoteMountService {
                     if (project.access !== access) throw new FSError('EACCES', 'Server project access unavailable');
                 }
                 checkOperation(options);
-                const next = grants.map(mount => ({...mount, mountId: randomUUID(), serverProjectRevision: project.revision,
+                const identity = fileBindingIdentity(project);
+                const next = grants.map(mount => ({...mount, mountId: randomUUID(), serverProjectRevision: project.revision, fileBindingIdentity: identity,
                     authorization:project.authorization ?? mount.authorization,
                     capabilities:project.capabilities ? {...project.capabilities,fileWrite:project.capabilities.fileWrite && access==='rw'} : undefined,
                     access: access === 'ro' ? 'ro' as const : mount.at === '/' ? 'rw' as const
@@ -1035,9 +1043,15 @@ export class ProjectRemoteMountService {
         const started = Date.now(), operationId = randomUUID(), fingerprint = JSON.stringify(this.list(projectId));
         try {
             const connection = await this.resolveConnection(root.connectionId, options);
-            const value = await inspectAuthorization(this.provider, connection, root, options); checkOperation(options);
+            const previous = this.authorizationInspections.get(root.mountId);
+            let identity = previous?.fingerprint === fingerprint ? previous.fileBindingIdentity : undefined;
+            const value = await inspectAuthorization(this.provider, connection, root, options, project => {
+                if (project.id === root.serverProjectId && project.revision === root.serverProjectRevision
+                    && sameFileAuthorization(root.authorization, project.authorization)) identity = fileBindingIdentity(project);
+            });
+            checkOperation(options);
             if (fingerprint !== JSON.stringify(this.list(projectId))) throw new FSError('ECONFLICT', 'Project binding changed during authorization inspection');
-            this.authorizationInspections.set(root.mountId, {fingerprint, value});
+            this.authorizationInspections.set(root.mountId, {fingerprint, value, fileBindingIdentity: identity});
             if (value.exportAccess === 'none' || value.projectAccess === 'denied') this.setStatus(root.mountId, 'offline');
             if (value.reason !== 'unverified') this.eventLog.record({module: 'cells', operation: 'project.authorization', projectId, connectionId: root.connectionId,
                 mountId: root.mountId, stage: 'authorization-inspect', operationId, result: value.code ? 'failure' : 'success', level: value.code ? 'error' : 'info',
@@ -1066,7 +1080,8 @@ export class ProjectRemoteMountService {
             : mounts.length && mounts.every(mount => mount.status === 'online') ? 'online' : 'unknown';
         const times = [...mounts.flatMap(mount => mount.checkedAt ? [mount.checkedAt] : []), ...issues.map(issue => issue.timestamp)];
         const problem: RemoteProjectStatus['problem'] = mounts.some(mount => mount.authorization?.exportAccess === 'none' || mount.authorization?.projectAccess === 'denied')
-            ? 'authorization-denied' : mounts.some(mount => mount.authorizationChanged) ? 'binding-outdated' : status === 'offline' ? 'connection-failed'
+            ? 'authorization-denied' : mounts.some(mount => mount.authorizationChanged
+                || mount.failure?.causeCodes?.some(code => code.startsWith('PROJECT_FILE_BINDING_'))) ? 'binding-outdated' : status === 'offline' ? 'connection-failed'
                 : filesBusy ? 'files-busy' : issue ? 'native-unavailable' : undefined;
         return {projectId, status, problem, ...(issue ? {issue: structuredClone(issue), issues: structuredClone(issues)} : {}), ...(times.length ? {checkedAt: Math.max(...times)} : {}), mounts};
     }
@@ -1139,7 +1154,7 @@ export class ProjectRemoteMountService {
             if (!mount) throw new FSError('ENOENT', 'Remote mount not found');
             const restore = secret ? this.provider.setCredential(mount.credentialRef, secret) : undefined;
             let next: FileSystemSourceOwner;
-            try { next = await this.provider.open(mount, options); }
+            try { next = await this.openMountSource(mount, projectId, options); }
             catch (error) { restore?.(); throw error; }
             const old = this.sources.get(mountId);
             try {
@@ -1255,14 +1270,58 @@ export class ProjectRemoteMountService {
     private hasMount(mountId: string): boolean {
         return !this.closed && Boolean(this.mountProject(mountId));
     }
+    private openMountSource(mount: ProjectRemoteMount, projectId: string, options?: OperationOptions) {
+        if (!mount.serverProjectId || !mount.connectionId || !this.provider.projects) return this.provider.open(mount, options);
+        return this.provider.open({...mount, recoverProjectRevision: (revision, request) =>
+            this.recoverFileBinding(projectId, mount, revision, request)}, options);
+    }
+    private async recoverFileBinding(projectId: string, mount: ProjectRemoteMount, revision: number, options: OperationOptions): Promise<number> {
+        const context = {operation: 'project.files.binding.recover', stage: 'verify', projectId, mountId: mount.mountId,
+            connectionId: mount.connectionId, operationId: randomUUID()};
+        const started = Date.now();
+        try {
+            const next = await this.readMatchingFileBinding(projectId, mount, revision, options);
+            this.eventLog.record({...context, module: 'cells', result: 'success', level: 'info', durationMs: Date.now() - started});
+            return next;
+        } catch (error) {
+            this.recordFailure(error, {...context, durationMs: Date.now() - started});
+            throw error;
+        }
+    }
+    private async readMatchingFileBinding(projectId: string, mount: ProjectRemoteMount, revision: number, options: OperationOptions): Promise<number> {
+        const grants = this.list(projectId), root = grants.find(item => item.at === '/'), fingerprint = JSON.stringify(grants);
+        const connection = await this.resolveConnection(mount.connectionId!, options);
+        if (!root || root.serverProjectId !== mount.serverProjectId || !grants.some(item => item.mountId === mount.mountId)
+            || !sameFileAuthorization(mount.authorization, root.authorization) || !sameFileAuthorization(root.authorization, connection.authorization))
+            throw fileBindingError('AUTHORIZATION_UNVERIFIED', 'Remote file authorization could not be verified');
+        const proof = this.authorizationInspections.get(root.mountId);
+        const identity = root.fileBindingIdentity ?? (proof?.fingerprint === fingerprint ? proof.fileBindingIdentity : undefined);
+        if (!identity) throw fileBindingError('DIRECTORY_UNVERIFIED', 'Previous remote directory identity could not be verified');
+        const client = this.provider.projects!(connection);
+        try {
+            const project = await client.read(root.serverProjectId!, options);
+            checkOperation(options);
+            if (this.closed || fingerprint !== JSON.stringify(this.list(projectId))
+                || !sameFileAuthorization(connection.authorization, this.connection(connection.id).authorization)
+                || !sameFileAuthorization(connection.authorization, project.authorization))
+                throw fileBindingError('AUTHORIZATION_CHANGED', 'Remote file authorization changed');
+            if (project.revision <= revision) throw fileBindingError('REVISION_NOT_ADVANCED', 'Remote file binding revision did not advance');
+            if (fileBindingIdentity(project) !== identity) throw fileBindingError('DIRECTORY_CHANGED', 'Remote file bindings or directory identities changed');
+            if (!project.capabilities?.fileRead || root.access === 'rw' && !project.capabilities.fileWrite)
+                throw fileBindingError('ACCESS_CHANGED', 'Remote file access changed');
+            this.assertProjectGrant(projectId, root, project);
+            return project.revision;
+        } finally { await client.close(); }
+    }
     private resolve(mount: ProjectRemoteMount, options?: OperationOptions) {
-        if (!this.hasMount(mount.mountId)) return Promise.reject(new FSError('ENOENT', 'Remote mount removed'));
+        const projectId = this.mountProject(mount.mountId);
+        if (this.closed || !projectId) return Promise.reject(new FSError('ENOENT', 'Remote mount removed'));
         if (mount.connectionId && this.isMountAuthorizationOutdated(mount, this.connection(mount.connectionId))) {
             return Promise.reject(new FSError('EACCES', 'Remote authorization changed; refresh the project binding'));
         }
         let owner = this.sources.get(mount.mountId);
         if (!owner) {
-            const opened = this.provider.open(mount, options).then(async source => {
+            const opened = this.openMountSource(mount, projectId, options).then(async source => {
                 if (!this.hasMount(mount.mountId) || this.sources.get(mount.mountId) !== opened) {
                     await source.dispose().catch(() => {});
                     throw new FSError('ECANCELLED', 'Remote mount released while opening');
@@ -1293,6 +1352,10 @@ export class ProjectRemoteMountService {
         const pending = this.tail.catch(() => {}).then(() => { if (this.closed) throw new FSError('EACCES', 'Remote mounts closed'); return action(); });
         this.tail = pending; return pending;
     }
+}
+
+function fileBindingError(reason: string, message: string): FSError {
+    return Object.assign(new FSError('ECONFLICT', message), {remoteCode: 'PROJECT_FILE_BINDING_' + reason});
 }
 
 function validateMount(mount: ProjectRemoteMount): void {
