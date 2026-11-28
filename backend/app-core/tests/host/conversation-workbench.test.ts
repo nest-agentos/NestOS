@@ -93,6 +93,16 @@ it('keeps the native view usable if the sidebar or composer read fails', async (
         expect(opened.failure).toBeUndefined();
     } finally {await opened.dispose();}
 });
+it('loads the cold AGY model catalog after the composer is visible', async () => {
+    const f = fixture();
+    const opened = await new ConversationWorkbench(f.services).initialize(f.backend, {...request,
+        resourceId: '/folder:P/@harness/agy/native', initialPage: {sidebar: false, composer: true}});
+    try {
+        expect(opened.native).toMatchObject({deferredMetadata: true, issues: {}});
+        expect(f.conversation.read).toHaveBeenCalledOnce();
+        expect(f.conversation.models).not.toHaveBeenCalled();
+    } finally {await opened.dispose();}
+});
 it('omits a folded sidebar and unrequested model and command catalogs', async () => {
     const f = fixture();
     vi.mocked(f.backend.readUiDocuments).mockResolvedValueOnce({layout: {version: 1, isSidebarCollapsed: true}});

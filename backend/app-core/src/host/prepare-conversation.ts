@@ -16,13 +16,14 @@ export async function prepareConversation(projects: ProjectService, resourceId: 
         conversation = await projects.remoteMounts.projectConversation(project.project.id, target.profileId, target.nativeSessionId, {timeoutMs: 3000}, target.archived);
         const boundAt = performance.now();
         stage = 'snapshot';
-        const composer = prepareInput && !target.archived ? prepareComposer(conversation, operationId) : undefined;
+        const deferredMetadata = !target.archived && (prepareInput === undefined || target.profileId === 'agy' && prepareInput);
+        const composer = prepareInput && !deferredMetadata && !target.archived ? prepareComposer(conversation, operationId) : undefined;
         const [snapshot, draft, input] = await Promise.all([conversation.read({includeUsage: false}),
             conversation.readComposerDraft?.(), composer]);
         log.info('conversation.open', {operation: 'workbench.conversation', operationId, stage: 'prepare', result: 'success',
             messageCount: snapshot.messages.length, bindingMs: Math.round(boundAt - started), snapshotMs: Math.round(performance.now() - boundAt),
             durationMs: Math.round(performance.now() - started)});
-        return {resourceId, project, conversation, draft, issues: {}, deferredMetadata: prepareInput === undefined, ...input};
+        return {resourceId, project, conversation, draft, issues: {}, deferredMetadata, ...input};
     } catch (error) {
         log.warn('conversation.open', {operation: 'workbench.conversation', operationId, stage, result: 'failure', code: safeCode(error), durationMs: Math.round(performance.now() - started)});
         if (conversation) await Promise.allSettled([conversation.close()]);
