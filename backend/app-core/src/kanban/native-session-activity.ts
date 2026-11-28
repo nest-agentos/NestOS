@@ -14,7 +14,8 @@ export function nativeSessionActivity(journal:PromptJournal,now:()=>number=Date.
         const started=Date.now();
         const id=key(boardId,sessionId),previous=cache.get(id)??await journal.get<Evidence>(id);
         const eventTime=typeof execution.observedAt==='number'&&Number.isFinite(execution.observedAt)&&execution.observedAt>=0?execution.observedAt:undefined;
-        const lastActivityAt=nativePhase(execution.status)==='unknown'?previous?.lastActivityAt:eventTime;
+        const priorActivity=previous?.nativeSessionId===execution.sessionId?previous?.lastActivityAt:undefined;
+        const lastActivityAt=nativePhase(execution.status)==='unknown'?priorActivity:Math.max(priorActivity??0,eventTime??0)||undefined;
         const value:Evidence={nativeSessionId:execution.sessionId,...(typeof execution.turnId==='string'?{turnId:execution.turnId}:{}),state:nativePhase(execution.status),...(lastActivityAt!==undefined?{lastActivityAt}:{}),observedAt:now()};
         if(!previous||JSON.stringify({...previous,observedAt:0})!==JSON.stringify({...value,observedAt:0})){await journal.update(id,()=>value);createModuleLogger('kanban').debug('Native session activity observed',{operation:'kanban.session.activity',operationId:sessionId,boardId,stage:'native.observe',result:'success',state:value.state,durationMs:Date.now()-started});}
         cache.delete(id);cache.set(id,value);if(cache.size>1000)cache.delete(cache.keys().next().value!);

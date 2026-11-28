@@ -34,3 +34,12 @@ it('passes native approval identity through metadata without inventing activity 
  const f=fixture();f.set({...f.fresh,execution:'waiting-approval',interactionIds:['epoch:number:0']});
  expect(await f.read(board,'execution',resource)).toMatchObject({state:'waiting-approval',interactionIds:['epoch:number:0'],lastActivityAt:100,stale:false});
 });
+
+it('projects native content timestamps without using observation time or overriding newer durable evidence',async()=>{
+ const f=fixture();
+ f.set({...f.fresh,updatedAt:50});
+ expect(await f.read(board,'execution',resource)).toMatchObject({lastActivityAt:100});
+ f.set({...f.fresh,updatedAt:200});
+ expect(await f.read(board,'execution',resource)).toMatchObject({lastActivityAt:200,observedAt:f.fresh.observedAt});
+ expect(f.status.read).not.toHaveBeenCalled();
+});

@@ -39,6 +39,7 @@ export function currentNativeSessionReader(options:Options):NativeSessionReader 
 function projectObservation(observation:HarnessObservation,previous:NativeSessionObservation|undefined):NativeSessionObservation {
     const stale=observation.stale||observation.connection!=='online'||Date.now()-observation.observedAt>30_000;
     const state=observation.execution==='idle'?observation.lastResult??'idle':observation.execution;
-    return {state:stale&&state==='running'?'unknown':state,lastActivityAt:previous?.lastActivityAt,
+    const lastActivityAt=Math.max(previous?.lastActivityAt??0,observation.updatedAt??0,observation.activity?.updatedAt??0)||undefined;
+    return {state:stale&&state==='running'?'unknown':state,lastActivityAt,
         interactionIds:observation.interactionIds,observedAt:observation.observedAt,stale,code:observation.refreshError?.code??(stale?'NATIVE_ACTIVITY_STALE':undefined)};
 }

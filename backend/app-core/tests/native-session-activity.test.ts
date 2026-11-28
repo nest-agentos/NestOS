@@ -35,3 +35,10 @@ it('does not turn disconnect or observation time into recent execution activity'
  await f.activity.record('board','execution',{sessionId:'native',status:'unknown',observedAt:1000});
  expect(await f.activity.read(board,'execution',resource)).toMatchObject({state:'unknown',lastActivityAt:900});
 });
+it('does not move the checkpoint backwards on a repeated or delayed channel observation',async()=>{
+ const f=fixture();
+ await f.activity.record('board','execution',{sessionId:'native',turnId:'turn',status:'running',observedAt:900});
+ await f.activity.record('board','execution',{sessionId:'native',turnId:'turn',status:'running',observedAt:850});
+ expect(await f.activity.read(board,'execution',resource)).toMatchObject({lastActivityAt:900});
+ expect(f.journal.update).toHaveBeenCalledOnce();
+});
